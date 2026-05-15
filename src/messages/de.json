@@ -1,0 +1,125 @@
+{
+  "nav": {
+    "home": "Start",
+    "wiki": "Wiki",
+    "leaderboard": "Bestenliste",
+    "profile": "Profil",
+    "login": "Anmelden",
+    "logout": "Abmelden",
+    "register": "Registrieren",
+    "admin": "Admin",
+    "game": "Spielpanel"
+  },
+  "common": {
+    "language": "Sprache",
+    "github": "GitHub",
+    "loading": "Lade…",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "edit": "Bearbeiten",
+    "create": "Anlegen",
+    "back": "Zurück",
+    "yes": "Ja",
+    "no": "Nein"
+  },
+  "footer": {
+    "imprint": "Impressum",
+    "privacy": "Datenschutz",
+    "tagline": "DIY Lasertag mit ESP32 — Open Source"
+  },
+  "home": {
+    "title": "hmyLaser32",
+    "subtitle": "DIY-Lasertag mit ESP32 — Online-Bridge & Wiki",
+    "intro": "hmyLaser32 ist ein DIY-Lasertag-System auf Basis von ESP32-Mikrocontrollern. Spielzustand wird lokal per ESP-NOW koordiniert; diese Website ist die optionale Online-Erweiterung mit Spielerprofilen, Statistiken und Bauanleitungen.",
+    "features": {
+      "wiki": "DIY-Wiki mit Schaltplänen und Bauanleitung",
+      "bridge": "Online-Bridge zum ESP32-Server für Live-Daten",
+      "profile": "Spielerprofile mit NFC-Token und Match-Historie",
+      "leaderboard": "Globale Bestenliste"
+    },
+    "cta_wiki": "Zum Wiki",
+    "cta_register": "Konto anlegen"
+  },
+  "auth": {
+    "login_title": "Anmelden",
+    "register_title": "Registrieren",
+    "username": "Benutzername",
+    "password": "Passwort",
+    "submit_login": "Anmelden",
+    "submit_register": "Konto anlegen",
+    "no_account": "Noch kein Konto?",
+    "have_account": "Bereits registriert?",
+    "errors": {
+      "invalid_credentials": "Benutzername oder Passwort falsch.",
+      "username_taken": "Benutzername bereits vergeben.",
+      "username_too_short": "Benutzername mindestens 3 Zeichen.",
+      "username_too_long": "Benutzername maximal 32 Zeichen.",
+      "username_invalid_chars": "Nur Buchstaben, Ziffern, _ . -",
+      "password_too_short": "Passwort mindestens 8 Zeichen.",
+      "password_too_long": "Passwort maximal 128 Zeichen.",
+      "server_error": "Serverfehler. Bitte später erneut versuchen."
+    }
+  },
+  "profile": {
+    "title": "Mein Profil",
+    "username": "Benutzername",
+    "role": "Rolle",
+    "nfc_token": "NFC-Token (UUID)",
+    "nfc_hint": "Schreibe diesen Token zusammen mit deinem Benutzernamen auf eine NFC-Karte, damit dich der ESP32-Server erkennt.",
+    "stats": "Statistiken",
+    "matches_played": "Matches gespielt",
+    "total_hits": "Treffer gesamt",
+    "total_deaths": "Tode gesamt",
+    "total_points": "Punkte gesamt",
+    "kd_ratio": "K/D",
+    "match_history": "Match-Verlauf",
+    "no_matches": "Noch keine Matches gespielt."
+  },
+  "leaderboard": {
+    "title": "Bestenliste",
+    "rank": "Rang",
+    "player": "Spieler",
+    "matches": "Matches",
+    "hits": "Treffer",
+    "points": "Punkte",
+    "empty": "Noch keine Daten."
+  },
+  "match": {
+    "title": "Match",
+    "started": "Gestartet",
+    "ended": "Beendet",
+    "duration": "Dauer",
+    "mode": "Modus",
+    "status": "Status",
+    "teams": "Teams",
+    "players": "Spieler"
+  },
+  "wiki": {
+    "title": "DIY Wiki",
+    "intro": "Hardware-Pläne, Software-Architektur, Bauanleitung und Bauteilliste — alles, was du brauchst, um das System nachzubauen.",
+    "hardware": "Hardware",
+    "architecture": "Architektur",
+    "build_guide": "Bauanleitung",
+    "components": "Bauteile",
+    "diagram_placeholder": "Diagramm folgt"
+  },
+  "admin": {
+    "title": "Admin",
+    "users": "Benutzer",
+    "devices": "ESP32-Server",
+    "matches": "Matches",
+    "no_access": "Kein Zugriff. Admin-Rolle erforderlich.",
+    "device_name": "Servername",
+    "access_code": "Access-Code",
+    "last_seen": "Zuletzt online",
+    "actions": "Aktionen",
+    "create_device": "Neuen ESP32-Server registrieren",
+    "code_generated": "Code generiert. Bitte sofort in den ESP32-Captive-Portal eintragen — er wird nur einmal angezeigt."
+  },
+  "game": {
+    "title": "Spielpanel",
+    "export_csv": "Als CSV exportieren",
+    "export_json": "Als JSON exportieren"
+  }
+}

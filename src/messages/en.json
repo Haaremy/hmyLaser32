@@ -1,0 +1,125 @@
+{
+  "nav": {
+    "home": "Home",
+    "wiki": "Wiki",
+    "leaderboard": "Leaderboard",
+    "profile": "Profile",
+    "login": "Log in",
+    "logout": "Log out",
+    "register": "Register",
+    "admin": "Admin",
+    "game": "Game panel"
+  },
+  "common": {
+    "language": "Language",
+    "github": "GitHub",
+    "loading": "Loading…",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "back": "Back",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "footer": {
+    "imprint": "Imprint",
+    "privacy": "Privacy",
+    "tagline": "DIY Lasertag with ESP32 — Open Source"
+  },
+  "home": {
+    "title": "hmyLaser32",
+    "subtitle": "DIY Lasertag with ESP32 — Online bridge & Wiki",
+    "intro": "hmyLaser32 is a DIY Lasertag system based on ESP32 microcontrollers. The game state is coordinated locally via ESP-NOW; this website is the optional online extension providing player profiles, statistics and build instructions.",
+    "features": {
+      "wiki": "DIY wiki with schematics and build guide",
+      "bridge": "Online bridge to the ESP32 server for live data",
+      "profile": "Player profiles with NFC tokens and match history",
+      "leaderboard": "Global leaderboard"
+    },
+    "cta_wiki": "Go to wiki",
+    "cta_register": "Create account"
+  },
+  "auth": {
+    "login_title": "Log in",
+    "register_title": "Register",
+    "username": "Username",
+    "password": "Password",
+    "submit_login": "Log in",
+    "submit_register": "Create account",
+    "no_account": "No account yet?",
+    "have_account": "Already registered?",
+    "errors": {
+      "invalid_credentials": "Wrong username or password.",
+      "username_taken": "Username already taken.",
+      "username_too_short": "Username must be at least 3 characters.",
+      "username_too_long": "Username must be at most 32 characters.",
+      "username_invalid_chars": "Only letters, digits, _ . -",
+      "password_too_short": "Password must be at least 8 characters.",
+      "password_too_long": "Password must be at most 128 characters.",
+      "server_error": "Server error. Please try again later."
+    }
+  },
+  "profile": {
+    "title": "My profile",
+    "username": "Username",
+    "role": "Role",
+    "nfc_token": "NFC token (UUID)",
+    "nfc_hint": "Write this token together with your username onto an NFC card, so the ESP32 server can identify you.",
+    "stats": "Statistics",
+    "matches_played": "Matches played",
+    "total_hits": "Total hits",
+    "total_deaths": "Total deaths",
+    "total_points": "Total points",
+    "kd_ratio": "K/D",
+    "match_history": "Match history",
+    "no_matches": "No matches played yet."
+  },
+  "leaderboard": {
+    "title": "Leaderboard",
+    "rank": "Rank",
+    "player": "Player",
+    "matches": "Matches",
+    "hits": "Hits",
+    "points": "Points",
+    "empty": "No data yet."
+  },
+  "match": {
+    "title": "Match",
+    "started": "Started",
+    "ended": "Ended",
+    "duration": "Duration",
+    "mode": "Mode",
+    "status": "Status",
+    "teams": "Teams",
+    "players": "Players"
+  },
+  "wiki": {
+    "title": "DIY Wiki",
+    "intro": "Hardware schematics, software architecture, build guide and components list — everything needed to replicate the system.",
+    "hardware": "Hardware",
+    "architecture": "Architecture",
+    "build_guide": "Build guide",
+    "components": "Components",
+    "diagram_placeholder": "Diagram coming soon"
+  },
+  "admin": {
+    "title": "Admin",
+    "users": "Users",
+    "devices": "ESP32 servers",
+    "matches": "Matches",
+    "no_access": "No access. Admin role required.",
+    "device_name": "Server name",
+    "access_code": "Access code",
+    "last_seen": "Last seen",
+    "actions": "Actions",
+    "create_device": "Register new ESP32 server",
+    "code_generated": "Code generated. Please enter it into the ESP32 captive portal immediately — it will only be shown once."
+  },
+  "game": {
+    "title": "Game panel",
+    "export_csv": "Export as CSV",
+    "export_json": "Export as JSON"
+  }
+}
