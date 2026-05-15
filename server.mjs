@@ -1,5 +1,5 @@
 // Custom Next.js entrypoint adding a WebSocket endpoint at /api/bridge/ws.
-// Authentication: ?token=<accessCode> query parameter (ESP32 sends the same access code as the REST bridge).
+// Authentication: ?token=<pin> query parameter OR Authorization: Bearer <pin>.
 import { createServer } from 'node:http';
 import { parse } from 'node:url';
 import next from 'next';
@@ -24,13 +24,31 @@ const httpServer = createServer((req, res) => {
 const wss = new WebSocketServer({ noServer: true });
 
 const espRooms = new Map(); // matchId → Set<WebSocket>
+const subscribers = new Map(); // matchId → Set<WebSocket> (browser/admin viewers)
 
 function broadcast(matchId, payload) {
   const room = espRooms.get(matchId);
-  if (!room) return;
+  const subs = subscribers.get(matchId);
   const data = JSON.stringify(payload);
-  for (const ws of room) {
+  for (const ws of [...(room || []), ...(subs || [])]) {
     if (ws.readyState === 1) ws.send(data);
+  }
+}
+
+async function persistHit(matchId, msg) {
+  try {
+    await prisma.hitEvent.create({
+      data: {
+        matchId,
+        ts: msg.ts ? new Date(msg.ts) : new Date(),
+        shooterNfc: msg.shooter || msg.shooterNfc || null,
+        targetNfc: msg.target || msg.targetNfc || null,
+        points: typeof msg.points === 'number' ? msg.points : 0,
+        raw: msg
+      }
+    });
+  } catch (e) {
+    console.error('hit persist error', e?.message);
   }
 }
 
@@ -41,7 +59,6 @@ httpServer.on('upgrade', async (req, socket, head) => {
     return;
   }
 
-  // Bearer via header (Authorization) or via ?token=
   let token = null;
   const authHeader = req.headers['authorization'];
   if (authHeader && authHeader.startsWith('Bearer ')) token = authHeader.slice(7).trim();
@@ -55,9 +72,9 @@ httpServer.on('upgrade', async (req, socket, head) => {
 
   let server;
   try {
-    server = await prisma.espServer.findUnique({ where: { accessCode: token }, select: { id: true } });
+    server = await prisma.espServer.findUnique({ where: { pin: token }, select: { id: true, name: true } });
   } catch (e) {
-    console.error('ws auth db error', e);
+    console.error('ws auth db error', e?.message);
   }
   if (!server) {
     socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
@@ -65,16 +82,14 @@ httpServer.on('upgrade', async (req, socket, head) => {
     return;
   }
 
+  await prisma.espServer.update({ where: { id: server.id }, data: { lastSeen: new Date(), online: true } });
+
   wss.handleUpgrade(req, socket, head, (ws) => {
     ws.serverId = server.id;
     ws.matchId = null;
-    ws.on('message', (raw) => {
+    ws.on('message', async (raw) => {
       let msg;
-      try {
-        msg = JSON.parse(raw.toString());
-      } catch {
-        return;
-      }
+      try { msg = JSON.parse(raw.toString()); } catch { return; }
       if (msg.type === 'subscribe' && typeof msg.matchId === 'string') {
         ws.matchId = msg.matchId;
         if (!espRooms.has(ws.matchId)) espRooms.set(ws.matchId, new Set());
@@ -83,6 +98,7 @@ httpServer.on('upgrade', async (req, socket, head) => {
         return;
       }
       if (msg.type === 'hit_event' && typeof msg.matchId === 'string') {
+        await persistHit(msg.matchId, msg);
         broadcast(msg.matchId, { type: 'hit_event', ...msg });
       }
       if (msg.type === 'timer_sync' && typeof msg.matchId === 'string') {
@@ -95,7 +111,7 @@ httpServer.on('upgrade', async (req, socket, head) => {
     ws.on('close', () => {
       if (ws.matchId && espRooms.has(ws.matchId)) espRooms.get(ws.matchId).delete(ws);
     });
-    ws.send(JSON.stringify({ type: 'hello', ts: Date.now() }));
+    ws.send(JSON.stringify({ type: 'hello', server: server.name, ts: Date.now() }));
   });
 });
 

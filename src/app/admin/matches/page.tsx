@@ -28,7 +28,7 @@ export default async function AdminMatchesPage() {
         <tbody>
           {matches.map((m) => (
             <tr key={m.id}>
-              <td><Link href={`/matches/${m.id}`}><code className="code">{m.id.slice(0, 8)}</code></Link></td>
+              <td><Link href={`/match/${m.id}`}><code className="code">{m.id.slice(0, 8)}</code></Link></td>
               <td>{m.server.name}</td>
               <td>{m.mode || '—'}</td>
               <td>{m.status}</td>

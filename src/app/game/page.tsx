@@ -23,8 +23,8 @@ export default async function GamePage() {
     <>
       <h1>{t('title')}</h1>
       <p>
-        <a className="btn" href="/api/matches/export?format=csv">{t('export_csv')}</a>{' '}
-        <a className="btn" href="/api/matches/export?format=json">{t('export_json')}</a>
+        <a className="btn" href="/api/match/export?format=csv">{t('export_csv')}</a>{' '}
+        <a className="btn" href="/api/match/export?format=json">{t('export_json')}</a>
       </p>
       <table>
         <thead>
@@ -33,7 +33,7 @@ export default async function GamePage() {
         <tbody>
           {matches.map((m) => (
             <tr key={m.id}>
-              <td><a href={`/matches/${m.id}`}><code className="code">{m.id.slice(0, 8)}</code></a></td>
+              <td><a href={`/match/${m.id}`}><code className="code">{m.id.slice(0, 8)}</code></a></td>
               <td>{m.server.name}</td>
               <td>{m.mode || '—'}</td>
               <td>{m.status}</td>

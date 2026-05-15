@@ -70,7 +70,7 @@ export default async function ProfilePage() {
           <tbody>
             {players.map((p) => (
               <tr key={p.id}>
-                <td><a href={`/matches/${p.match.id}`}>{new Date(p.match.startedAt).toLocaleString()}</a></td>
+                <td><a href={`/match/${p.match.id}`}>{new Date(p.match.startedAt).toLocaleString()}</a></td>
                 <td>{p.match.mode || '—'}</td>
                 <td>{p.hits}</td>
                 <td>{p.deaths}</td>

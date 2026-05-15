@@ -22,14 +22,17 @@ model User {
   matches      MatchPlayer[]
 }
 
+/// ESP32-Server registriert sich selbst via POST /api/bridge/register.
+/// `name` + `pin` werden vom ESP generiert; `pin` ist gleichzeitig der Access-Code
+/// für Bridge-API-Calls und Settings-Edit im Web-UI.
 model EspServer {
-  id         String    @id @default(cuid())
-  name       String
-  accessCode String    @unique
-  lastSeen   DateTime?
-  ownerId    String?
-  createdAt  DateTime  @default(now())
-  matches    Match[]
+  id        String    @id @default(cuid())
+  name      String    @unique
+  pin       String    @unique
+  lastSeen  DateTime?
+  online    Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  matches   Match[]
 }
 
 model Match {
@@ -41,23 +44,27 @@ model Match {
   durationSeconds Int?
   mode            String?
   status          String        @default("active")
+  settings        Json?
   players         MatchPlayer[]
   teams           Team[]
+  hits            HitEvent[]
 }
 
 model MatchPlayer {
-  id       String  @id @default(cuid())
-  matchId  String
-  match    Match   @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  userId   String?
-  user     User?   @relation(fields: [userId], references: [id])
-  nfcToken String
-  teamId   String?
-  team     Team?   @relation(fields: [teamId], references: [id])
-  hits     Int     @default(0)
-  deaths   Int     @default(0)
-  points   Int     @default(0)
+  id        String  @id @default(cuid())
+  matchId   String
+  match     Match   @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?   @relation(fields: [userId], references: [id])
+  nfcToken  String
+  teamId    String?
+  team      Team?   @relation(fields: [teamId], references: [id])
+  hits      Int     @default(0)
+  deaths    Int     @default(0)
+  points    Int     @default(0)
+  shotsFired Int    @default(0)
 
+  @@unique([matchId, nfcToken])
   @@index([matchId])
   @@index([userId])
 }
@@ -70,4 +77,19 @@ model Team {
   color       String
   totalPoints Int           @default(0)
   players     MatchPlayer[]
+}
+
+/// Live-Feed-Quelle: jeder Hit-Event vom ESP wird hier persistiert.
+/// Ermöglicht Live-Stream (WebSocket) + chronologische Re-Wiedergabe in der Match-Detail-Ansicht.
+model HitEvent {
+  id         String   @id @default(cuid())
+  matchId    String
+  match      Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  ts         DateTime @default(now())
+  shooterNfc String?
+  targetNfc  String?
+  points     Int      @default(0)
+  raw        Json?
+
+  @@index([matchId, ts])
 }
