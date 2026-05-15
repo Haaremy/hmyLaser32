@@ -17,13 +17,12 @@ export async function Header() {
           <Link href="/wiki">{t('wiki')}</Link>
           <Link href="/leaderboard">{t('leaderboard')}</Link>
           {isAuth && <Link href="/profile">{t('profile')}</Link>}
-          {isAuth && <Link href="/game">{t('game')}</Link>}
           {isAdmin && <Link href="/admin">{t('admin')}</Link>}
           {!isAuth && <Link href="/auth/login">{t('login')}</Link>}
           {!isAuth && <Link href="/auth/register">{t('register')}</Link>}
           {isAuth && (
             <form action="/api/auth/logout" method="post" style={{ margin: 0 }}>
-              <button type="submit">{t('logout')}</button>
+              <button type="submit" className="btn btn-sm">{t('logout')}</button>
             </form>
           )}
           <LangSwitch />

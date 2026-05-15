@@ -3,12 +3,11 @@
     "home": "Home",
     "wiki": "Wiki",
     "leaderboard": "Leaderboard",
-    "profile": "Profile",
+    "profile": "My profile",
     "login": "Log in",
     "logout": "Log out",
     "register": "Register",
-    "admin": "Admin",
-    "game": "Game panel"
+    "admin": "Admin"
   },
   "common": {
     "language": "Language",
@@ -21,7 +20,11 @@
     "create": "Create",
     "back": "Back",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "online": "Online",
+    "offline": "Offline",
+    "lastSeen": "Last seen",
+    "now": "now"
   },
   "footer": {
     "imprint": "Imprint",
@@ -30,20 +33,21 @@
   },
   "home": {
     "title": "hmyLaser32",
-    "subtitle": "DIY Lasertag with ESP32 — Online bridge & Wiki",
-    "intro": "hmyLaser32 is a DIY Lasertag system based on ESP32 microcontrollers. The game state is coordinated locally via ESP-NOW; this website is the optional online extension providing player profiles, statistics and build instructions.",
-    "features": {
-      "wiki": "DIY wiki with schematics and build guide",
-      "bridge": "Online bridge to the ESP32 server for live data",
-      "profile": "Player profiles with NFC tokens and match history",
-      "leaderboard": "Global leaderboard"
-    },
-    "cta_wiki": "Go to wiki",
-    "cta_register": "Create account"
+    "subtitle": "DIY Lasertag with ESP32 — Live status & Wiki",
+    "intro": "Active game devices and running matches on your local network.",
+    "quicklinks": "Quick links",
+    "wiki_short": "Build guide",
+    "profile_short": "My profile",
+    "esps_heading": "Available ESP servers",
+    "esps_empty": "No ESP server registered yet. Boot an ESP — it will appear automatically.",
+    "active_match": "Active match",
+    "no_active_match": "No running match",
+    "open_match": "Open match",
+    "esp_open": "View live"
   },
   "auth": {
     "login_title": "Log in",
-    "register_title": "Register",
+    "register_title": "Create account",
     "username": "Username",
     "password": "Password",
     "submit_login": "Log in",
@@ -73,11 +77,12 @@
     "total_deaths": "Total deaths",
     "total_points": "Total points",
     "kd_ratio": "K/D",
+    "accuracy": "Accuracy",
     "match_history": "Match history",
     "no_matches": "No matches played yet."
   },
   "leaderboard": {
-    "title": "Leaderboard",
+    "title": "Global leaderboard",
     "rank": "Rank",
     "player": "Player",
     "matches": "Matches",
@@ -87,39 +92,52 @@
   },
   "match": {
     "title": "Match",
+    "tab_live": "Live status",
+    "tab_settings": "Settings",
     "started": "Started",
     "ended": "Ended",
     "duration": "Duration",
+    "remaining": "Time left",
     "mode": "Mode",
     "status": "Status",
     "teams": "Teams",
-    "players": "Players"
+    "players": "Players",
+    "leaderboard": "Leaderboard",
+    "live_feed": "Live feed",
+    "no_feed": "No hits yet.",
+    "shot": "Hit",
+    "score": "Score",
+    "settings_locked": "This section is protected by the ESP server PIN.",
+    "settings_pin_label": "ESP server PIN",
+    "settings_unlock": "Unlock",
+    "settings_invalid_pin": "Invalid PIN.",
+    "settings_save": "Save",
+    "settings_saved": "Settings saved.",
+    "settings_duration": "Match duration (seconds)",
+    "settings_mode": "Game mode",
+    "settings_extra": "Extra settings (JSON)",
+    "live_indicator": "Live"
   },
   "wiki": {
     "title": "DIY Wiki",
-    "intro": "Hardware schematics, software architecture, build guide and components list — everything needed to replicate the system.",
+    "intro": "Scientific documentation of the hmyLaser32 prototype — hardware components, architecture and build guide.",
     "hardware": "Hardware",
     "architecture": "Architecture",
     "build_guide": "Build guide",
     "components": "Components",
-    "diagram_placeholder": "Diagram coming soon"
+    "paper_v1": "Paper V1 (PDF)",
+    "paper_v2": "Paper V2",
+    "paper_v2_coming_soon": "In progress — extension follows.",
+    "diagram_placeholder": "Diagram coming soon",
+    "abstract": "Abstract",
+    "figure": "Fig.",
+    "table": "Tab.",
+    "source": "Source"
   },
   "admin": {
     "title": "Admin",
     "users": "Users",
-    "devices": "ESP32 servers",
     "matches": "Matches",
-    "no_access": "No access. Admin role required.",
-    "device_name": "Server name",
-    "access_code": "Access code",
-    "last_seen": "Last seen",
-    "actions": "Actions",
-    "create_device": "Register new ESP32 server",
-    "code_generated": "Code generated. Please enter it into the ESP32 captive portal immediately — it will only be shown once."
-  },
-  "game": {
-    "title": "Game panel",
-    "export_csv": "Export as CSV",
-    "export_json": "Export as JSON"
+    "no_access": "No access. Admin role required."
   }
 }
