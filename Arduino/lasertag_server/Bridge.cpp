@@ -257,6 +257,45 @@ bool bridgeForwardHit(const char *shooterNfc, const char *targetNfc, int points)
   return code == 200;
 }
 
+// Extrahiert das NEC-Command-Byte aus dem 32-bit playerId.
+// NEC-Encoding (siehe IRremoteESP8266 encodeNEC): bits 8..15 = command.
+static uint8_t necCommand(uint32_t playerId) {
+  return (uint8_t)((playerId >> 8) & 0xFFu);
+}
+
+bool bridgePushKnownPlayers() {
+  if (!g_wifiConnected || !g_portalRegistered) return false;
+
+  // Body aus g_snapshots zusammensetzen
+  String body = "{\"players\":[";
+  bool first = true;
+  unsigned long nowMs = millis();
+  for (int i = 0; i < MAX_PLAYERS; i++) {
+    if (g_snapshots[i].player[0] == '\0') continue;
+    uint8_t cmd = necCommand(g_snapshots[i].playerId);
+    if (cmd == 0) continue;
+    if (!first) body += ",";
+    first = false;
+    body += "{\"name\":\"";
+    body += g_snapshots[i].player;
+    body += "\",\"command\":";
+    body += String((unsigned)cmd);
+    body += ",\"playerId\":";
+    body += String((unsigned long)g_snapshots[i].playerId);
+    body += ",\"points\":";
+    body += String((int)g_snapshots[i].lastPoints);
+    body += ",\"lastSeenSec\":";
+    body += String((unsigned long)((nowMs - g_snapshots[i].lastUpdate) / 1000UL));
+    body += "}";
+  }
+  body += "]}";
+
+  String resp;
+  int code = postJson(EP_PLAYERS, body, resp);
+  if (code != 200) LT_LOG("players push HTTP %d", code);
+  return code == 200;
+}
+
 bool bridgeEndMatch(const EndPlayer *players, int count) {
   if (strlen(g_currentMatchId) == 0) return false;
   String body = "{\"matchId\":\"";

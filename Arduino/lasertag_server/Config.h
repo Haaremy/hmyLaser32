@@ -20,6 +20,7 @@ constexpr char EP_MATCH_START[]   = "/api/bridge/match/start";
 constexpr char EP_MATCH_END[]     = "/api/bridge/match/end";
 constexpr char EP_HIT[]           = "/api/bridge/hit";
 constexpr char EP_ESP_SETTINGS[]  = "/api/esp/by-pin/settings";
+constexpr char EP_PLAYERS[]       = "/api/bridge/players";    // POST known clients
 
 // --- Identity --------------------------------------------------------------
 constexpr int IDENTITY_PIN_DIGITS = 4;
@@ -45,6 +46,7 @@ constexpr unsigned long SETTINGS_PULL_INTERVAL_MS = 30000;
 constexpr unsigned long PORTAL_REGISTER_RETRY_MS = 15000;
 constexpr unsigned long PHASE_BROADCAST_MS       = 1500;
 constexpr unsigned long TEAMS_BROADCAST_MS       = 3000;  // Teams alle 3 s re-broadcast
+constexpr unsigned long PLAYERS_PUSH_INTERVAL_MS = 30000; // Snapshots an Webservice senden
 
 // --- Logging ---------------------------------------------------------------
 #define LT_LOG(fmt, ...) Serial.printf("[%s] " fmt "\n", __func__, ##__VA_ARGS__)

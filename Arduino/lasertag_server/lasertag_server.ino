@@ -1,5 +1,5 @@
 // ============================================================================
-// hmyLaser32 — ESP-Server (v2: AP+STA dualmode, mDNS, Phase-Broadcast)
+// hmyLaser32 — ESP-Server (v3: + Team-Modus, Known-Clients-Push)
 // ----------------------------------------------------------------------------
 // Modulares Arduino-Projekt für einen ESP32 NodeMCU-32S, das als Bridge
 // zwischen den ESP-NOW-Clients und dem Web-Portal (laser32.haaremy.de) dient.
@@ -44,7 +44,13 @@ char g_mdnsHost[48]    = {0};
 uint8_t g_staChannel   = WIFI_CHANNEL;
 
 MatchPhase    g_matchPhase = MATCH_IDLE;
-MatchSettings g_settings   = { "free-for-all", DEFAULT_LOBBY_SECONDS, DEFAULT_MATCH_SECONDS };
+MatchSettings g_settings = {
+  .mode = "free-for-all",
+  .lobbySeconds = DEFAULT_LOBBY_SECONDS,
+  .matchSeconds = DEFAULT_MATCH_SECONDS,
+  .teamCount = 0,
+  .teams = {}
+};
 char          g_currentMatchId[40] = {0};
 unsigned long g_lobbyEndsAtMs = 0;
 unsigned long g_matchEndsAtMs = 0;
@@ -77,11 +83,19 @@ void loop() {
   static unsigned long lastHeartbeat = 0;
   static unsigned long lastRegisterRetry = 0;
   static unsigned long lastSettingsPull = 0;
+  static unsigned long lastPlayersPush = 0;
 
   wifiLoop();
   portalLoop();
   espNowLoop();
   matchLoop();
+
+  // Bekannte Clients an den Webservice melden (für den Team-Editor)
+  if (g_wifiConnected && g_portalRegistered &&
+      millis() - lastPlayersPush > PLAYERS_PUSH_INTERVAL_MS) {
+    lastPlayersPush = millis();
+    bridgePushKnownPlayers();
+  }
 
   // Heartbeat zum Portal
   if (g_wifiConnected && g_portalRegistered &&

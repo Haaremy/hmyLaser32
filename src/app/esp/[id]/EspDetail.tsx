@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { RelativeTime } from '@/components/RelativeTime';
 import type { TeamDef } from '@/lib/teams';
+import type { KnownPlayer } from '@/lib/players';
 
 type Match = { id: string; startedAt: string; status: string; mode: string | null; durationSeconds: number | null };
 type Mode = 'free-for-all' | 'team';
@@ -18,6 +19,7 @@ type Props = {
   lobbySeconds: number;
   matchSeconds: number;
   teams: TeamDef[];
+  knownPlayers: KnownPlayer[];
   startRequested: boolean;
   matches: Match[];
 };
@@ -79,6 +81,28 @@ function Overview({ p, tm }: { p: Props; tm: ReturnType<typeof useTranslations> 
           </div>
         </div>
       )}
+      {p.knownPlayers.length > 0 && (
+        <div className="hmy-card">
+          <div className="hmy-card__header">Verbundene Clients ({p.knownPlayers.length})</div>
+          <div className="hmy-card__body">
+            <table>
+              <thead>
+                <tr><th>Name</th><th className="num">NEC-Cmd</th><th className="num">Punkte</th><th>Zuletzt gesehen</th></tr>
+              </thead>
+              <tbody>
+                {p.knownPlayers.map((kp) => (
+                  <tr key={kp.command}>
+                    <td><code className="hmy-code">{kp.name}</code></td>
+                    <td className="num">{kp.command}</td>
+                    <td className="num">{kp.points}</td>
+                    <td className="num">{kp.lastSeenSec}s</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       <h2>{tm('title')} ({p.matches.length})</h2>
       {p.matches.length === 0 ? (
         <p>—</p>
@@ -112,6 +136,7 @@ function Settings({ p }: { p: Props }) {
   const [mode, setMode] = useState<Mode>((p.mode === 'team' ? 'team' : 'free-for-all'));
   const [starttimer, setStarttimer] = useState(p.lobbySeconds);
   const [duration, setDuration] = useState(p.matchSeconds);
+
   const [teams, setTeams] = useState<TeamDef[]>(
     p.teams.length > 0
       ? p.teams
@@ -120,10 +145,47 @@ function Settings({ p }: { p: Props }) {
           { name: 'Blau', color: DEFAULT_COLORS[1], members: [] }
         ]
   );
-  const [pin, setPin] = useState('');
-  const [msg, setMsg] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [startPending, setStartPending] = useState(p.startRequested);
+
+  // Live-Refresh der bekannten Clients: alle 5 s neu pollen
+  const [knownPlayers, setKnownPlayers] = useState<KnownPlayer[]>(p.knownPlayers);
+  useEffect(() => {
+    const t = setInterval(async () => {
+      try {
+        const r = await fetch(`/api/esp/${p.id}/players`, { cache: 'no-store' });
+        if (r.ok) {
+          const d = await r.json();
+          setKnownPlayers(d.players || []);
+        }
+      } catch {}
+    }, 5000);
+    return () => clearInterval(t);
+  }, [p.id]);
+
+  // Plus alle Mitglieder, die in den Teams angegeben sind, aber (noch) nicht
+  // als knownPlayer gemeldet wurden — damit eine Vorab-Konfig nicht verloren geht.
+  const allCommands = useMemo(() => {
+    const set = new Set<number>();
+    knownPlayers.forEach((kp) => set.add(kp.command));
+    teams.forEach((t) => t.members.forEach((m) => set.add(m)));
+    return Array.from(set).sort((a, b) => a - b);
+  }, [knownPlayers, teams]);
+
+  function teamOfCommand(cmd: number): number {
+    return teams.findIndex((t) => t.members.includes(cmd));
+  }
+  function assignToTeam(cmd: number, teamIdx: number) {
+    setTeams(
+      teams.map((t, i) => ({
+        ...t,
+        members: i === teamIdx
+          ? Array.from(new Set([...t.members, cmd]))
+          : t.members.filter((m) => m !== cmd)
+      }))
+    );
+  }
+  function unassignCommand(cmd: number) {
+    setTeams(teams.map((t) => ({ ...t, members: t.members.filter((m) => m !== cmd) })));
+  }
 
   function addTeam() {
     if (teams.length >= 4) return;
@@ -136,32 +198,18 @@ function Settings({ p }: { p: Props }) {
   function updateTeam(idx: number, patch: Partial<TeamDef>) {
     setTeams(teams.map((t, i) => (i === idx ? { ...t, ...patch } : t)));
   }
-  function updateMembers(idx: number, csv: string) {
-    const ids = csv
-      .split(/[\s,]+/)
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .map((s) => {
-        const n = s.toLowerCase().startsWith('0x') ? parseInt(s, 16) : parseInt(s, 10);
-        return Number.isFinite(n) && n >= 1 && n <= 254 ? n : NaN;
-      })
-      .filter((n) => Number.isFinite(n)) as number[];
-    updateTeam(idx, { members: Array.from(new Set(ids)) });
-  }
+
+  const [pin, setPin] = useState('');
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [startPending, setStartPending] = useState(p.startRequested);
 
   async function saveSettings(e: React.FormEvent) {
     e.preventDefault();
     setMsg(null);
     setErr(null);
-    const body: any = {
-      pin,
-      mode,
-      lobbySeconds: starttimer,
-      matchSeconds: duration
-    };
-    if (mode === 'team') body.teams = teams;
-    else body.teams = [];
-
+    const body: any = { pin, mode, lobbySeconds: starttimer, matchSeconds: duration };
+    body.teams = mode === 'team' ? teams : [];
     const r = await fetch(`/api/esp/${p.id}/settings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -228,7 +276,7 @@ function Settings({ p }: { p: Props }) {
               <fieldset style={{ border: '1px solid var(--hmy-color-border-default)', borderRadius: 'var(--hmy-radius-base)', padding: 'var(--hmy-spacing-3)', margin: 'var(--hmy-spacing-4) 0' }}>
                 <legend style={{ padding: '0 0.5rem', fontWeight: 600 }}>Teams ({teams.length} / 4)</legend>
                 {teams.map((t, i) => (
-                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '36px 1fr 1fr auto', gap: 'var(--hmy-spacing-3)', alignItems: 'center', marginBottom: 'var(--hmy-spacing-3)' }}>
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '36px 1fr auto', gap: 'var(--hmy-spacing-3)', alignItems: 'center', marginBottom: 'var(--hmy-spacing-3)' }}>
                     <input
                       type="color"
                       value={t.color}
@@ -243,13 +291,6 @@ function Settings({ p }: { p: Props }) {
                       placeholder="Team-Name"
                       maxLength={12}
                     />
-                    <input
-                      className="hmy-input"
-                      value={t.members.join(', ')}
-                      onChange={(e) => updateMembers(i, e.target.value)}
-                      placeholder="Mitglieder (NEC-IDs, z. B. 1, 3, 5)"
-                      style={{ fontFamily: 'var(--hmy-font-family-mono)' }}
-                    />
                     <button
                       type="button"
                       className="hmy-btn hmy-btn--sm hmy-btn--danger"
@@ -261,13 +302,68 @@ function Settings({ p }: { p: Props }) {
                     </button>
                   </div>
                 ))}
-                <p style={{ fontSize: 'var(--hmy-font-size-xs)', color: 'var(--hmy-color-text-muted)', margin: 'var(--hmy-spacing-2) 0' }}>
-                  Mitglieder werden über die <code className="hmy-code">MY_IR_COMMAND</code>-ID der Player-ESPs zugeordnet
-                  (1–254). Mehrere durch Komma trennen — z. B. <code className="hmy-code">1, 3, 5</code> für PLAYER_1, PLAYER_3, PLAYER_5.
-                </p>
                 <button type="button" className="hmy-btn hmy-btn--sm" onClick={addTeam} disabled={teams.length >= 4}>
                   + Team hinzufügen
                 </button>
+
+                <h4 style={{ marginTop: '1.5rem', marginBottom: '0.5rem' }}>Spielerzuordnung</h4>
+                <p style={{ fontSize: 'var(--hmy-font-size-xs)', color: 'var(--hmy-color-text-muted)', margin: '0 0 var(--hmy-spacing-3)' }}>
+                  {knownPlayers.length === 0 && teams.every((t) => t.members.length === 0)
+                    ? 'Noch keine Clients verbunden. Sobald ein Player-ESP über ESP-NOW Daten sendet, erscheint er hier.'
+                    : `${knownPlayers.length} Client(s) gemeldet. Wähle pro Spieler ein Team.`}
+                </p>
+
+                {allCommands.length > 0 && (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Client</th>
+                        <th className="num">NEC</th>
+                        <th>Team</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allCommands.map((cmd) => {
+                        const known = knownPlayers.find((kp) => kp.command === cmd);
+                        const idx = teamOfCommand(cmd);
+                        return (
+                          <tr key={cmd}>
+                            <td>
+                              <code className="hmy-code">{known?.name ?? `PLAYER_${cmd}`}</code>
+                              {!known && (
+                                <span style={{ marginLeft: 8, fontSize: 'var(--hmy-font-size-xs)', color: 'var(--hmy-color-text-muted)' }}>
+                                  (offline)
+                                </span>
+                              )}
+                            </td>
+                            <td className="num">{cmd}</td>
+                            <td>
+                              <select
+                                className="hmy-select"
+                                value={idx}
+                                onChange={(e) => {
+                                  const v = Number(e.target.value);
+                                  if (v < 0) unassignCommand(cmd);
+                                  else assignToTeam(cmd, v);
+                                }}
+                                style={
+                                  idx >= 0
+                                    ? { borderLeft: `4px solid ${teams[idx].color}`, paddingLeft: '0.5rem' }
+                                    : {}
+                                }
+                              >
+                                <option value={-1}>— Kein Team —</option>
+                                {teams.map((t, i) => (
+                                  <option key={i} value={i}>{t.name}</option>
+                                ))}
+                              </select>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
               </fieldset>
             )}
 
@@ -292,7 +388,7 @@ function Settings({ p }: { p: Props }) {
       </section>
 
       <section className="hmy-card">
-        <div className="hmy-card__header">Timer starten</div>
+        <div className="hmy-card__header">Match Beginnen</div>
         <div className="hmy-card__body">
           <p style={{ marginTop: 0, color: 'var(--hmy-color-text-muted)', fontSize: 'var(--hmy-font-size-sm)' }}>
             Setzt ein Flag, das der ESP-Server beim nächsten Pull (~30 s) aufnimmt. Anschließend

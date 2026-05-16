@@ -48,6 +48,11 @@ model EspServer {
   // Der ESP wertet es im nächsten Pull aus und setzt es wieder zurück.
   startRequested Boolean   @default(false)
 
+  // Vom ESP-Server periodisch gemeldete Liste der via ESP-NOW gesehenen Clients.
+  // JSON-Array: [{ "name": "PLAYER_1", "command": 1, "playerId": 16711935,
+  //                "points": 0, "lastSeenSec": 3 }, ...]
+  knownPlayers   Json?
+
   matches        Match[]
 }
 

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
 import { isOnline } from '@/lib/bridge';
 import { parseTeams } from '@/lib/teams';
+import { parseKnownPlayers } from '@/lib/players';
 import { EspDetail } from './EspDetail';
 
 export const dynamic = 'force-dynamic';
@@ -29,6 +30,7 @@ export default async function EspDetailPage({ params }: { params: { id: string }
       lobbySeconds={server.lobbySeconds}
       matchSeconds={server.matchSeconds}
       teams={parseTeams(server.teams)}
+      knownPlayers={parseKnownPlayers(server.knownPlayers)}
       startRequested={server.startRequested}
       matches={server.matches.map((m) => ({
         id: m.id,
