@@ -1,13 +1,10 @@
 {
   "nav": {
-    "home": "Home",
-    "wiki": "Wiki",
-    "leaderboard": "Leaderboard",
-    "profile": "My profile",
-    "login": "Log in",
-    "logout": "Log out",
-    "register": "Register",
-    "admin": "Admin"
+    "home": "Servers",
+    "research": "Research",
+    "diy": "DIY",
+    "account": "Account",
+    "champions": "Champions"
   },
   "common": {
     "language": "Language",
@@ -15,16 +12,10 @@
     "loading": "Loading…",
     "save": "Save",
     "cancel": "Cancel",
-    "delete": "Delete",
-    "edit": "Edit",
-    "create": "Create",
     "back": "Back",
-    "yes": "Yes",
-    "no": "No",
     "online": "Online",
     "offline": "Offline",
-    "lastSeen": "Last seen",
-    "now": "now"
+    "logout": "Log out"
   },
   "footer": {
     "imprint": "Imprint",
@@ -33,27 +24,67 @@
   },
   "home": {
     "title": "hmyLaser32",
-    "subtitle": "DIY Lasertag with ESP32 — Live status & Wiki",
-    "intro": "Active game devices and running matches on your local network.",
-    "quicklinks": "Quick links",
-    "wiki_short": "Build guide",
-    "profile_short": "My profile",
+    "subtitle": "DIY Lasertag with ESP32 — Live status & game servers",
     "esps_heading": "Available ESP servers",
-    "esps_empty": "No ESP server registered yet. Boot an ESP — it will appear automatically.",
+    "esps_empty": "No ESP server registered yet. Boot a server-ESP — it will appear automatically.",
     "active_match": "Active match",
-    "no_active_match": "No running match",
-    "open_match": "Open match",
-    "esp_open": "View live"
+    "no_active_match": "No running match"
   },
-  "auth": {
-    "login_title": "Log in",
-    "register_title": "Create account",
+  "research": {
+    "title": "Research",
+    "intro": "Scientific documentation of the hmyLaser32 prototype — component comparison, measurements, and architectural decisions.",
+    "paper_v1_title": "Paper V1 — Local Multiplayer Lasertag",
+    "paper_v1_meta": "Jeremy Becker · Anhalt University of Applied Sciences · 2026",
+    "paper_v1_abstract": "Prototype lasertag with ESP32 + IR components + ESP-NOW/Gossip. Component comparison (6 IR senders / 4 receivers / 7 controllers), range tests in four scenarios.",
+    "paper_v2_title": "Paper V2 — Extension",
+    "paper_v2_abstract": "Online bridge to the web portal, persistent player profiles, enclosure design.",
+    "paper_v2_coming_soon": "In progress",
+    "download_pdf": "Download PDF",
+    "read_online": "Read online",
+    "soon": "Coming soon"
+  },
+  "diy": {
+    "title": "Build guide",
+    "subtitle": "Step-by-step to your own hmyLaser32 set — derived from the final paper.",
+    "based_on_v1": "This guide is based on Paper V1. Paper V2 with extended setup is in progress.",
+    "meta_difficulty": "Difficulty",
+    "meta_difficulty_value": "Medium",
+    "meta_time": "Build time",
+    "meta_time_value": "1 day per set",
+    "meta_cost": "Material cost",
+    "meta_cost_value": "≈ €25 per player",
+    "meta_players": "Players",
+    "meta_players_value": "2 to 10",
+    "ingredients_heading": "Components per player",
+    "tools_heading": "Tools",
+    "steps_heading": "Preparation",
+    "server_heading": "Additional: server ESP",
+    "qty": "Qty",
+    "hint": "Notes",
+    "source": "Source"
+  },
+  "account": {
+    "title": "Account",
+    "subtitle_logged_out": "Log in or create an account to see your stats and NFC token.",
+    "tab_login": "Log in",
+    "tab_register": "Create account",
     "username": "Username",
     "password": "Password",
     "submit_login": "Log in",
     "submit_register": "Create account",
-    "no_account": "No account yet?",
-    "have_account": "Already registered?",
+    "profile_heading": "Profile",
+    "stats_heading": "Statistics",
+    "history_heading": "Match history",
+    "role": "Role",
+    "nfc_token": "NFC token (UUID)",
+    "nfc_hint": "Write this token together with your username onto an NFC card, so the ESP32 server can identify you.",
+    "matches_played": "Matches played",
+    "total_hits": "Total hits",
+    "total_deaths": "Total deaths",
+    "total_points": "Total points",
+    "kd_ratio": "K/D",
+    "accuracy": "Accuracy",
+    "no_matches": "No matches played yet.",
     "errors": {
       "invalid_credentials": "Wrong username or password.",
       "username_taken": "Username already taken.",
@@ -65,28 +96,19 @@
       "server_error": "Server error. Please try again later."
     }
   },
-  "profile": {
-    "title": "My profile",
-    "username": "Username",
-    "role": "Role",
-    "nfc_token": "NFC token (UUID)",
-    "nfc_hint": "Write this token together with your username onto an NFC card, so the ESP32 server can identify you.",
-    "stats": "Statistics",
-    "matches_played": "Matches played",
-    "total_hits": "Total hits",
-    "total_deaths": "Total deaths",
-    "total_points": "Total points",
-    "kd_ratio": "K/D",
-    "accuracy": "Accuracy",
-    "match_history": "Match history",
-    "no_matches": "No matches played yet."
-  },
-  "leaderboard": {
-    "title": "Global leaderboard",
+  "champions": {
+    "title": "Champions",
+    "subtitle": "The global leaderboard — sorted by your filter.",
+    "filter_kills": "Hits",
+    "filter_matches": "Matches won",
+    "filter_kd": "K/D",
+    "filter_overall": "Overall",
     "rank": "Rank",
     "player": "Player",
     "matches": "Matches",
     "hits": "Hits",
+    "deaths": "Deaths",
+    "kd": "K/D",
     "points": "Points",
     "empty": "No data yet."
   },
@@ -117,27 +139,5 @@
     "settings_mode": "Game mode",
     "settings_extra": "Extra settings (JSON)",
     "live_indicator": "Live"
-  },
-  "wiki": {
-    "title": "DIY Wiki",
-    "intro": "Scientific documentation of the hmyLaser32 prototype — hardware components, architecture and build guide.",
-    "hardware": "Hardware",
-    "architecture": "Architecture",
-    "build_guide": "Build guide",
-    "components": "Components",
-    "paper_v1": "Paper V1 (PDF)",
-    "paper_v2": "Paper V2",
-    "paper_v2_coming_soon": "In progress — extension follows.",
-    "diagram_placeholder": "Diagram coming soon",
-    "abstract": "Abstract",
-    "figure": "Fig.",
-    "table": "Tab.",
-    "source": "Source"
-  },
-  "admin": {
-    "title": "Admin",
-    "users": "Users",
-    "matches": "Matches",
-    "no_access": "No access. Admin role required."
   }
 }

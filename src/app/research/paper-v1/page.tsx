@@ -1,13 +1,13 @@
 export default function PaperV1Page() {
   return (
-    <article className="paper-prose">
+    <article className="hmy-lt-paper">
       <header>
         <h1>Paper V1 — Entwicklung eines lokalen Multiplayer Lasertag Games</h1>
         <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9em' }}>
           Jeremy Becker · Fachbereich Informatik und Sprachen · Hochschule Anhalt, Köthen
         </p>
         <p>
-          <a className="btn btn-primary" href="/papers/Lasertag_Paper_V1.pdf" download>
+          <a className="hmy-btn hmy-btn--primary" href="/papers/Lasertag_Paper_V1.pdf" download>
             📄 Volltext herunterladen (PDF, 2.3 MB)
           </a>
         </p>
@@ -154,7 +154,7 @@ export default function PaperV1Page() {
       </p>
 
       <p style={{ marginTop: '2rem' }}>
-        <a className="btn" href="/papers/Lasertag_Paper_V1.pdf" download>
+        <a className="hmy-btn hmy-btn--secondary" href="/papers/Lasertag_Paper_V1.pdf" download>
           📄 Volltext mit allen Tabellen und Quellen herunterladen
         </a>
       </p>

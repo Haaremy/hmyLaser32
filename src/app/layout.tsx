@@ -7,7 +7,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'hmyLaser32 — DIY Lasertag',
-  description: 'DIY Lasertag system based on ESP32 — online bridge & wiki',
+  description: 'DIY Lasertag system based on ESP32 — research, build guide & live status',
   robots: { index: true, follow: true }
 };
 
@@ -20,7 +20,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <NextIntlClientProvider locale={locale} messages={messages}>
           <Header />
           <main>
-            <div className="container">{children}</div>
+            <div className="hmy-container">{children}</div>
           </main>
           <Footer />
         </NextIntlClientProvider>

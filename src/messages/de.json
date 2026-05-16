@@ -1,13 +1,10 @@
 {
   "nav": {
-    "home": "Start",
-    "wiki": "Wiki",
-    "leaderboard": "Bestenliste",
-    "profile": "Mein Profil",
-    "login": "Anmelden",
-    "logout": "Abmelden",
-    "register": "Registrieren",
-    "admin": "Admin"
+    "home": "Server",
+    "research": "Forschung",
+    "diy": "DIY",
+    "account": "Account",
+    "champions": "Champions"
   },
   "common": {
     "language": "Sprache",
@@ -15,16 +12,10 @@
     "loading": "Lade…",
     "save": "Speichern",
     "cancel": "Abbrechen",
-    "delete": "Löschen",
-    "edit": "Bearbeiten",
-    "create": "Anlegen",
     "back": "Zurück",
-    "yes": "Ja",
-    "no": "Nein",
     "online": "Online",
     "offline": "Offline",
-    "lastSeen": "Zuletzt online",
-    "now": "jetzt"
+    "logout": "Abmelden"
   },
   "footer": {
     "imprint": "Impressum",
@@ -33,27 +24,67 @@
   },
   "home": {
     "title": "hmyLaser32",
-    "subtitle": "DIY-Lasertag mit ESP32 — Live-Status & Wiki",
-    "intro": "Aktive Spielgeräte und laufende Matches in deinem lokalen Netz.",
-    "quicklinks": "Schnellzugriff",
-    "wiki_short": "Bauanleitung",
-    "profile_short": "Mein Profil",
+    "subtitle": "DIY-Lasertag mit ESP32 — Live-Status & Spielserver",
     "esps_heading": "Verfügbare ESP-Server",
-    "esps_empty": "Noch kein ESP-Server registriert. Starte einen ESP — er meldet sich automatisch.",
+    "esps_empty": "Noch kein ESP-Server registriert. Starte einen Server-ESP — er meldet sich automatisch.",
     "active_match": "Aktives Spiel",
-    "no_active_match": "Kein laufendes Spiel",
-    "open_match": "Spiel öffnen",
-    "esp_open": "Live ansehen"
+    "no_active_match": "Kein laufendes Spiel"
   },
-  "auth": {
-    "login_title": "Anmelden",
-    "register_title": "Konto anlegen",
+  "research": {
+    "title": "Forschung",
+    "intro": "Wissenschaftliche Dokumentation des hmyLaser32-Prototyps — Komponenten-Vergleich, Messreihen und Architektur-Entscheidungen.",
+    "paper_v1_title": "Paper V1 — Entwicklung eines lokalen Multiplayer Lasertag Games",
+    "paper_v1_meta": "Jeremy Becker · Hochschule Anhalt · 2026",
+    "paper_v1_abstract": "Prototyp-Lasertag mit ESP32 + IR-Komponenten + ESP-NOW/Gossip. Komponenten-Vergleich (6 IR-Sender / 4 Empfänger / 7 Controller), Reichweitenmessungen in vier Szenarien.",
+    "paper_v2_title": "Paper V2 — Erweiterung",
+    "paper_v2_abstract": "Online-Bridge zum Web-Portal, persistente Spielerprofile, Gehäuse-Design.",
+    "paper_v2_coming_soon": "In Arbeit",
+    "download_pdf": "PDF herunterladen",
+    "read_online": "Online lesen",
+    "soon": "Bald verfügbar"
+  },
+  "diy": {
+    "title": "Bauanleitung",
+    "subtitle": "Schritt-für-Schritt zum eigenen hmyLaser32-Set — abgeleitet aus dem finalen Paper.",
+    "based_on_v1": "Diese Anleitung basiert auf Paper V1. Paper V2 mit erweitertem Setup folgt.",
+    "meta_difficulty": "Schwierigkeit",
+    "meta_difficulty_value": "Mittel",
+    "meta_time": "Bauzeit",
+    "meta_time_value": "1 Tag pro Set",
+    "meta_cost": "Materialkosten",
+    "meta_cost_value": "≈ 25 € pro Spieler",
+    "meta_players": "Spieler",
+    "meta_players_value": "2 bis 10",
+    "ingredients_heading": "Komponenten pro Spieler",
+    "tools_heading": "Werkzeug",
+    "steps_heading": "Zubereitung",
+    "server_heading": "Zusätzlich: Server-ESP",
+    "qty": "Menge",
+    "hint": "Hinweis",
+    "source": "Bezugsquelle"
+  },
+  "account": {
+    "title": "Account",
+    "subtitle_logged_out": "Melde dich an oder erstelle ein Konto, um deine Statistik und deinen NFC-Token zu sehen.",
+    "tab_login": "Anmelden",
+    "tab_register": "Konto anlegen",
     "username": "Benutzername",
     "password": "Passwort",
     "submit_login": "Anmelden",
     "submit_register": "Konto anlegen",
-    "no_account": "Noch kein Konto?",
-    "have_account": "Bereits registriert?",
+    "profile_heading": "Profil",
+    "stats_heading": "Statistik",
+    "history_heading": "Match-Verlauf",
+    "role": "Rolle",
+    "nfc_token": "NFC-Token (UUID)",
+    "nfc_hint": "Schreibe diesen Token zusammen mit deinem Benutzernamen auf eine NFC-Karte, damit dich der ESP32-Server erkennt.",
+    "matches_played": "Matches gespielt",
+    "total_hits": "Treffer gesamt",
+    "total_deaths": "Tode gesamt",
+    "total_points": "Punkte gesamt",
+    "kd_ratio": "K/D",
+    "accuracy": "Trefferquote",
+    "no_matches": "Noch keine Matches gespielt.",
     "errors": {
       "invalid_credentials": "Benutzername oder Passwort falsch.",
       "username_taken": "Benutzername bereits vergeben.",
@@ -65,28 +96,19 @@
       "server_error": "Serverfehler. Bitte später erneut versuchen."
     }
   },
-  "profile": {
-    "title": "Mein Profil",
-    "username": "Benutzername",
-    "role": "Rolle",
-    "nfc_token": "NFC-Token (UUID)",
-    "nfc_hint": "Schreibe diesen Token zusammen mit deinem Benutzernamen auf eine NFC-Karte, damit dich der ESP32-Server erkennt.",
-    "stats": "Statistiken",
-    "matches_played": "Matches gespielt",
-    "total_hits": "Treffer gesamt",
-    "total_deaths": "Tode gesamt",
-    "total_points": "Punkte gesamt",
-    "kd_ratio": "K/D",
-    "accuracy": "Trefferquote",
-    "match_history": "Match-Verlauf",
-    "no_matches": "Noch keine Matches gespielt."
-  },
-  "leaderboard": {
-    "title": "Globale Bestenliste",
+  "champions": {
+    "title": "Champions",
+    "subtitle": "Die globale Rangliste — sortiert nach deinem Filter.",
+    "filter_kills": "Treffer",
+    "filter_matches": "Beendete Spiele",
+    "filter_kd": "K/D",
+    "filter_overall": "Gesamtwertung",
     "rank": "Rang",
     "player": "Spieler",
     "matches": "Matches",
     "hits": "Treffer",
+    "deaths": "Tode",
+    "kd": "K/D",
     "points": "Punkte",
     "empty": "Noch keine Daten."
   },
@@ -117,27 +139,5 @@
     "settings_mode": "Spielmodus",
     "settings_extra": "Zusatz-Einstellungen (JSON)",
     "live_indicator": "Live"
-  },
-  "wiki": {
-    "title": "DIY Wiki",
-    "intro": "Wissenschaftliche Dokumentation des hmyLaser32-Prototyps — Hardware-Komponenten, Architektur und Bauanleitung.",
-    "hardware": "Hardware",
-    "architecture": "Architektur",
-    "build_guide": "Bauanleitung",
-    "components": "Bauteilliste",
-    "paper_v1": "Paper V1 (PDF)",
-    "paper_v2": "Paper V2",
-    "paper_v2_coming_soon": "In Arbeit — Erweiterung folgt.",
-    "diagram_placeholder": "Diagramm folgt",
-    "abstract": "Kurzfassung",
-    "figure": "Abb.",
-    "table": "Tab.",
-    "source": "Quelle"
-  },
-  "admin": {
-    "title": "Admin",
-    "users": "Benutzer",
-    "matches": "Matches",
-    "no_access": "Kein Zugriff. Admin-Rolle erforderlich."
   }
 }

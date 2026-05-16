@@ -3,10 +3,11 @@ import { getSession } from '@/lib/session';
 
 export const runtime = 'nodejs';
 
-async function handle() {
+async function handle(req: Request) {
   const session = await getSession();
   session.destroy();
-  return NextResponse.redirect(new URL('/', process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'));
+  const url = new URL(req.url);
+  return NextResponse.redirect(new URL('/account', url.origin));
 }
 
 export const POST = handle;

@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic';
 export default async function EspDetailPage({ params }: { params: { id: string } }) {
   const t = await getTranslations('home');
   const tm = await getTranslations('match');
+  const tc = await getTranslations('common');
   const server = await db.espServer.findUnique({
     where: { id: params.id },
     include: {
@@ -23,21 +24,24 @@ export default async function EspDetailPage({ params }: { params: { id: string }
 
   return (
     <>
-      <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontFamily: 'var(--font-family-mono)' }}>
+      <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontFamily: 'var(--hmy-font-family-mono)' }}>
         {server.name}
       </h1>
-      <p style={{ color: online ? 'var(--color-status-success)' : 'var(--color-text-muted)' }}>
-        ● {online ? 'Online' : 'Offline'} · <RelativeTime ts={server.lastSeen ? new Date(server.lastSeen).toISOString() : null} />
+      <p>
+        <span className={`hmy-lt-pill ${online ? 'hmy-lt-pill--success' : 'hmy-lt-pill--muted'}`}>
+          {online ? tc('online') : tc('offline')}
+        </span>{' '}
+        <span style={{ color: 'var(--hmy-color-text-muted)', fontSize: 'var(--hmy-font-size-sm)' }}>
+          · <RelativeTime ts={server.lastSeen ? new Date(server.lastSeen).toISOString() : null} />
+        </span>
       </p>
 
       {active && (
-        <div className="card">
-          <strong>{t('active_match')}</strong>
-          <p>
-            <Link href={`/match/${active.id}`} className="btn btn-primary">
-              {t('open_match')}
-            </Link>
-          </p>
+        <div className="hmy-card">
+          <div className="hmy-card__header">{t('active_match')}</div>
+          <div className="hmy-card__body">
+            <Link href={`/match/${active.id}`} className="hmy-btn hmy-btn--primary">{tm('title')} →</Link>
+          </div>
         </div>
       )}
 
@@ -51,7 +55,7 @@ export default async function EspDetailPage({ params }: { params: { id: string }
               <th>{tm('started')}</th>
               <th>{tm('mode')}</th>
               <th>{tm('status')}</th>
-              <th>{tm('duration')}</th>
+              <th className="num">{tm('duration')}</th>
             </tr>
           </thead>
           <tbody>

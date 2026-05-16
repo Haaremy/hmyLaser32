@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   const t = await getTranslations('home');
+  const tc = await getTranslations('common');
 
   const servers = await db.espServer.findMany({
     orderBy: [{ online: 'desc' }, { lastSeen: 'desc' }],
@@ -27,36 +28,31 @@ export default async function HomePage() {
 
   return (
     <>
-      <section className="hero">
+      <section className="hmy-lt-hero">
         <h1>{t('title')}</h1>
-        <p className="subtitle">{t('subtitle')}</p>
-
-        <div className="quicklinks">
-          <Link href="/wiki/build/run" className="quicklink">🛠 {t('wiki_short')}</Link>
-          <Link href="/profile" className="quicklink">👤 {t('profile_short')}</Link>
-        </div>
+        <p>{t('subtitle')}</p>
       </section>
 
       <h2>{t('esps_heading')}</h2>
 
       {servers.length === 0 ? (
-        <div className="alert alert-info">{t('esps_empty')}</div>
+        <div className="hmy-alert hmy-alert--info">{t('esps_empty')}</div>
       ) : (
-        <div className="esp-grid">
+        <div className="hmy-lt-esp-grid">
           {servers.map((s) => {
             const online = isOnline(s.lastSeen);
             const m = s.matches[0];
             const target = m ? `/match/${m.id}` : `/esp/${s.id}`;
             return (
-              <Link href={target} key={s.id} className="esp-card">
-                <div className="esp-name">{s.name}</div>
-                <div className={`esp-status ${online ? 'online' : 'offline'}`}>
-                  {online ? t('open_match').replace(t('open_match'), '') || 'online' : 'offline'}
+              <Link href={target} key={s.id} className="hmy-lt-esp-card">
+                <div className="hmy-lt-esp-card__name">{s.name}</div>
+                <div className={`hmy-lt-esp-card__status ${online ? 'is-online' : 'is-offline'}`}>
+                  {online ? tc('online') : tc('offline')}
                   <span style={{ marginLeft: 'auto', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
                     <RelativeTime ts={s.lastSeen ? new Date(s.lastSeen).toISOString() : null} />
                   </span>
                 </div>
-                <div className="esp-match">
+                <div className="hmy-lt-esp-card__match">
                   {m ? (
                     <>
                       <strong>{m.mode || 'Match'}</strong>

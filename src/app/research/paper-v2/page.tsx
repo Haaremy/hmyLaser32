@@ -1,10 +1,10 @@
 export default function PaperV2Page() {
   return (
-    <article className="paper-prose">
+    <article className="hmy-lt-paper">
       <h1>Paper V2 — Erweiterung</h1>
       <p style={{ color: 'var(--color-text-muted)' }}>In Arbeit. Diese Seite wird befüllt, sobald die Erweiterungsarbeit veröffentlicht ist.</p>
 
-      <div className="card" style={{ marginTop: '2rem' }}>
+      <div className="hmy-card hmy-card__body" style={{ marginTop: '2rem' }}>
         <h3 style={{ marginTop: 0 }}>Geplante Themen</h3>
         <ul>
           <li>Online-Bridge zum Web-Portal (Implementiert in hmyLaser32 v0.2)</li>
@@ -16,8 +16,8 @@ export default function PaperV2Page() {
       </div>
 
       <p>
-        Bis dahin: siehe <a href="/wiki/research/paper-v1">Paper V1</a> und die{' '}
-        <a href="/wiki/build/hardware">aktuelle Bauanleitung</a>.
+        Bis dahin: siehe <a href="/research/paper-v1">Paper V1</a> und die{' '}
+        <a href="/diy">aktuelle Bauanleitung</a>.
       </p>
     </article>
   );

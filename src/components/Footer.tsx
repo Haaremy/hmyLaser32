@@ -3,8 +3,8 @@ import { getTranslations } from 'next-intl/server';
 export async function Footer() {
   const t = await getTranslations('footer');
   return (
-    <footer className="site">
-      <div className="container row">
+    <footer className="hmy-footer">
+      <div className="hmy-container hmy-footer__row">
         <span>© {new Date().getFullYear()} Haaremy · {t('tagline')}</span>
         <span>
           <a href="https://legal.haaremy.de/impressum">{t('imprint')}</a>{' · '}

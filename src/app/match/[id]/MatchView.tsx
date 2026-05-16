@@ -61,7 +61,6 @@ export function MatchView({ matchId }: { matchId: string }) {
       const r = await fetch(`/api/match/${matchId}/live`, { cache: 'no-store' });
       if (!r.ok) throw new Error(`http ${r.status}`);
       const data: LiveState = await r.json();
-      // Highlight neue Feed-Einträge
       const fresh = new Set<string>();
       for (const f of data.feed) {
         if (!seenIdsRef.current.has(f.id)) fresh.add(f.id);
@@ -84,22 +83,24 @@ export function MatchView({ matchId }: { matchId: string }) {
     return () => clearInterval(i);
   }, [fetchLive]);
 
-  if (err && !state) return <div className="alert alert-error">{err}</div>;
+  if (err && !state) return <div className="hmy-alert hmy-alert--error">{err}</div>;
   if (!state) return <p>{t('title')}…</p>;
 
   const isLive = state.match.status === 'active';
   const remaining = state.match.remainingSeconds;
-  const remainingCls = remaining !== null && remaining < 60 ? 'danger' : remaining !== null && remaining < 180 ? 'warning' : '';
+  let timerCls = '';
+  if (remaining !== null && remaining < 60) timerCls = 'is-danger';
+  else if (remaining !== null && remaining < 180) timerCls = 'is-warning';
 
   return (
     <>
-      <div className="match-header">
+      <div className="hmy-lt-match-header">
         <div>
           <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             {state.server.name}
-            {isLive && <span className="live-badge">{t('live_indicator')}</span>}
+            {isLive && <span className="hmy-lt-live-badge">{t('live_indicator')}</span>}
           </h1>
-          <div className="match-meta">
+          <div className="hmy-lt-match-meta">
             <span><strong>{t('mode')}:</strong> {state.match.mode || '—'}</span>
             <span><strong>{t('status')}:</strong> {state.match.status}</span>
             <span><strong>{t('started')}:</strong> {new Date(state.match.startedAt).toLocaleTimeString()}</span>
@@ -107,28 +108,38 @@ export function MatchView({ matchId }: { matchId: string }) {
         </div>
         {remaining !== null && (
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)', marginBottom: 4 }}>
+            <div style={{ fontSize: 'var(--hmy-font-size-xs)', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--hmy-color-text-muted)', marginBottom: 4 }}>
               {t('remaining')}
             </div>
-            <div className={`timer ${remainingCls}`}>{formatTime(remaining)}</div>
+            <div className={`hmy-lt-timer ${timerCls}`}>{formatTime(remaining)}</div>
           </div>
         )}
       </div>
 
-      <div className="tabs">
-        <button className={tab === 'live' ? 'active' : ''} onClick={() => setTab('live')}>
+      <div className="hmy-tabs" role="tablist">
+        <button
+          role="tab"
+          aria-selected={tab === 'live'}
+          className={`hmy-tab ${tab === 'live' ? 'hmy-tab--active' : ''}`}
+          onClick={() => setTab('live')}
+        >
           {t('tab_live')}
         </button>
-        <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>
+        <button
+          role="tab"
+          aria-selected={tab === 'settings'}
+          className={`hmy-tab ${tab === 'settings' ? 'hmy-tab--active' : ''}`}
+          onClick={() => setTab('settings')}
+        >
           {t('tab_settings')}
         </button>
       </div>
 
       {tab === 'live' ? (
-        <div className="live-grid">
+        <div className="hmy-lt-live-grid">
           <div>
             <h2 style={{ marginTop: 0 }}>{t('leaderboard')}</h2>
-            <div className="lb-row head">
+            <div className="hmy-lt-lb-row is-head">
               <div>#</div>
               <div>{t('players')}</div>
               <div style={{ textAlign: 'right' }}>K/D</div>
@@ -137,25 +148,25 @@ export function MatchView({ matchId }: { matchId: string }) {
               <div style={{ textAlign: 'right' }}>{t('score')}</div>
             </div>
             {state.leaderboard.length === 0 ? (
-              <p style={{ color: 'var(--color-text-muted)' }}>—</p>
+              <p style={{ color: 'var(--hmy-color-text-muted)' }}>—</p>
             ) : (
               state.leaderboard.map((p, i) => (
-                <div className="lb-row" key={p.id}>
-                  <div className={`lb-rank ${i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : ''}`}>
+                <div className="hmy-lt-lb-row" key={p.id}>
+                  <div className={`hmy-lt-rank ${i === 0 ? 'is-gold' : i === 1 ? 'is-silver' : i === 2 ? 'is-bronze' : ''}`}>
                     {i + 1}
                   </div>
-                  <div className="lb-name" style={{ borderLeftColor: p.teamColor, color: p.teamColor }}>
+                  <div className="hmy-lt-lb-name" style={{ borderLeftColor: p.teamColor, color: p.teamColor }}>
                     {p.name}
                     {p.teamName && (
-                      <span style={{ marginLeft: 8, fontSize: '0.75em', opacity: 0.7, color: 'var(--color-text-secondary)' }}>
+                      <span style={{ marginLeft: 8, fontSize: '0.75em', opacity: 0.7, color: 'var(--hmy-color-text-secondary)' }}>
                         {p.teamName}
                       </span>
                     )}
                   </div>
-                  <div className="lb-num">{p.kd}</div>
-                  <div className="lb-num">{p.accuracy === null ? '—' : `${p.accuracy}%`}</div>
-                  <div className="lb-num">{p.hits}</div>
-                  <div className="lb-num lb-points">{p.points}</div>
+                  <div className="hmy-lt-num">{p.kd}</div>
+                  <div className="hmy-lt-num">{p.accuracy === null ? '—' : `${p.accuracy}%`}</div>
+                  <div className="hmy-lt-num">{p.hits}</div>
+                  <div className="hmy-lt-num hmy-lt-points">{p.points}</div>
                 </div>
               ))
             )}
@@ -163,19 +174,19 @@ export function MatchView({ matchId }: { matchId: string }) {
 
           <div>
             <h2 style={{ marginTop: 0 }}>{t('live_feed')}</h2>
-            <div className="feed">
+            <div className="hmy-lt-feed">
               {state.feed.length === 0 ? (
-                <p style={{ color: 'var(--color-text-muted)' }}>{t('no_feed')}</p>
+                <p style={{ color: 'var(--hmy-color-text-muted)' }}>{t('no_feed')}</p>
               ) : (
                 state.feed.map((f) => (
-                  <div className={`feed-row ${newFeedIds.has(f.id) ? 'new' : ''}`} key={f.id}>
-                    <span className="feed-ts">{new Date(f.ts).toLocaleTimeString()}</span>
-                    <span className="feed-text">
+                  <div className={`hmy-lt-feed__row ${newFeedIds.has(f.id) ? 'is-new' : ''}`} key={f.id}>
+                    <span className="hmy-lt-feed__ts">{new Date(f.ts).toLocaleTimeString()}</span>
+                    <span className="hmy-lt-feed__text">
                       <strong>{nameForToken(f.shooter, state.leaderboard)}</strong>
                       {' → '}
                       <strong>{nameForToken(f.target, state.leaderboard)}</strong>
                     </span>
-                    <span className="feed-pts">+{f.points}</span>
+                    <span className="hmy-lt-feed__pts">+{f.points}</span>
                   </div>
                 ))
               )}
@@ -193,7 +204,6 @@ function SettingsTab({ matchId }: { matchId: string }) {
   const t = useTranslations('match');
   const [pin, setPin] = useState('');
   const [unlocked, setUnlocked] = useState(false);
-  const [settings, setSettings] = useState<Record<string, unknown>>({});
   const [duration, setDuration] = useState<number | ''>('');
   const [mode, setMode] = useState('');
   const [extra, setExtra] = useState('{}');
@@ -204,7 +214,6 @@ function SettingsTab({ matchId }: { matchId: string }) {
     fetch(`/api/match/${matchId}/settings`).then(async (r) => {
       if (r.ok) {
         const d = await r.json();
-        setSettings(d.settings || {});
         setMode(d.mode || '');
         setDuration(d.durationSeconds ?? '');
         setExtra(JSON.stringify(d.settings || {}, null, 2));
@@ -239,66 +248,87 @@ function SettingsTab({ matchId }: { matchId: string }) {
 
   if (!unlocked) {
     return (
-      <div className="card" style={{ maxWidth: 480, margin: '0 auto' }}>
-        <p>{t('settings_locked')}</p>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setUnlocked(true);
-          }}
-        >
-          <label>
-            <span>{t('settings_pin_label')}</span>
-            <input
-              type="password"
-              autoComplete="off"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              required
-              minLength={4}
-              style={{ fontFamily: 'var(--font-family-mono)', letterSpacing: '0.2em' }}
-            />
-          </label>
-          {err && <div className="alert alert-error">{err}</div>}
-          <button className="btn btn-primary" type="submit">
-            {t('settings_unlock')}
-          </button>
-        </form>
+      <div className="hmy-card" style={{ maxWidth: 480, margin: '0 auto' }}>
+        <div className="hmy-card__body">
+          <p>{t('settings_locked')}</p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setUnlocked(true);
+            }}
+          >
+            <div className="hmy-field">
+              <label className="hmy-field__label">{t('settings_pin_label')}</label>
+              <input
+                type="password"
+                autoComplete="off"
+                className="hmy-input"
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                required
+                minLength={4}
+                style={{ fontFamily: 'var(--hmy-font-family-mono)', letterSpacing: '0.2em' }}
+              />
+            </div>
+            {err && <div className="hmy-alert hmy-alert--error">{err}</div>}
+            <button className="hmy-btn hmy-btn--primary" type="submit">
+              {t('settings_unlock')}
+            </button>
+          </form>
+        </div>
       </div>
     );
   }
 
   return (
-    <form onSubmit={save} className="card" style={{ maxWidth: 640, margin: '0 auto' }}>
-      <label>
-        <span>{t('settings_mode')}</span>
-        <input value={mode} onChange={(e) => setMode(e.target.value)} placeholder="team-deathmatch" />
-      </label>
-      <label>
-        <span>{t('settings_duration')}</span>
-        <input type="number" min={30} max={86400} value={duration} onChange={(e) => setDuration(e.target.value === '' ? '' : Number(e.target.value))} />
-      </label>
-      <label>
-        <span>{t('settings_extra')}</span>
-        <textarea rows={6} value={extra} onChange={(e) => setExtra(e.target.value)} style={{ fontFamily: 'var(--font-family-mono)', fontSize: '0.85rem' }} />
-      </label>
-      <label>
-        <span>{t('settings_pin_label')}</span>
-        <input
-          type="password"
-          autoComplete="off"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-          required
-          minLength={4}
-          style={{ fontFamily: 'var(--font-family-mono)', letterSpacing: '0.2em' }}
-        />
-      </label>
-      {err && <div className="alert alert-error">{err}</div>}
-      {msg && <div className="alert alert-success">{msg}</div>}
-      <button className="btn btn-primary" type="submit">
-        {t('settings_save')}
-      </button>
+    <form onSubmit={save} className="hmy-card" style={{ maxWidth: 640, margin: '0 auto' }}>
+      <div className="hmy-card__body">
+        <div className="hmy-field">
+          <label className="hmy-field__label">{t('settings_mode')}</label>
+          <input className="hmy-input" value={mode} onChange={(e) => setMode(e.target.value)} placeholder="team-deathmatch" />
+        </div>
+        <div className="hmy-field">
+          <label className="hmy-field__label">{t('settings_duration')}</label>
+          <input
+            className="hmy-input"
+            type="number"
+            min={30}
+            max={86400}
+            value={duration}
+            onChange={(e) => setDuration(e.target.value === '' ? '' : Number(e.target.value))}
+          />
+        </div>
+        <div className="hmy-field">
+          <label className="hmy-field__label">{t('settings_extra')}</label>
+          <textarea
+            className="hmy-textarea"
+            rows={6}
+            value={extra}
+            onChange={(e) => setExtra(e.target.value)}
+            style={{ fontFamily: 'var(--hmy-font-family-mono)', fontSize: '0.85rem' }}
+          />
+        </div>
+        <div className="hmy-field">
+          <label className="hmy-field__label">{t('settings_pin_label')}</label>
+          <input
+            className="hmy-input"
+            type="password"
+            autoComplete="off"
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            required
+            minLength={4}
+            style={{ fontFamily: 'var(--hmy-font-family-mono)', letterSpacing: '0.2em' }}
+          />
+        </div>
+        {err && <div className="hmy-alert hmy-alert--error">{err}</div>}
+        {msg && <div className="hmy-alert hmy-alert--success">{msg}</div>}
+      </div>
+      <div className="hmy-card__footer">
+        <button className="hmy-btn hmy-btn--primary" type="submit">
+          {t('settings_save')}
+        </button>
+      </div>
     </form>
   );
 }

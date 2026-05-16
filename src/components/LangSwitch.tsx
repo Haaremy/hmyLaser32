@@ -16,9 +16,9 @@ export function LangSwitch() {
   }
 
   return (
-    <span className="lang-switch" aria-label={t('language')}>
-      <button type="button" className={locale === 'de' ? 'active' : ''} onClick={() => setLocale('de')}>DE</button>{' '}
-      <button type="button" className={locale === 'en' ? 'active' : ''} onClick={() => setLocale('en')}>EN</button>
+    <span className="hmy-lt-lang" aria-label={t('language')}>
+      <button type="button" className={locale === 'de' ? 'is-active' : ''} onClick={() => setLocale('de')}>DE</button>
+      <button type="button" className={locale === 'en' ? 'is-active' : ''} onClick={() => setLocale('en')}>EN</button>
     </span>
   );
 }
