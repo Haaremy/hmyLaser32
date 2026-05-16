@@ -8,9 +8,7 @@
 
 bool peerExists(const uint8_t *mac) {
   for (int i = 0; i < peerCount; i++) {
-    if (memcmp(knownPeers[i], mac, 6) == 0) {
-      return true;
-    }
+    if (memcmp(knownPeers[i], mac, 6) == 0) return true;
   }
   return false;
 }
@@ -18,26 +16,19 @@ bool peerExists(const uint8_t *mac) {
 void printMac(const uint8_t *mac) {
   for (int i = 0; i < 6; i++) {
     Serial.printf("%02X", mac[i]);
-    if (i < 5) {
-      Serial.print(":");
-    }
+    if (i < 5) Serial.print(":");
   }
 }
 
 void addPeer(const uint8_t *mac) {
-  if (peerExists(mac) || peerCount >= MAX_PEERS) {
-    return;
-  }
-
+  if (peerExists(mac) || peerCount >= MAX_PEERS) return;
   esp_now_peer_info_t peerInfo = {};
   memcpy(peerInfo.peer_addr, mac, 6);
   peerInfo.channel = WIFI_CHANNEL;
   peerInfo.encrypt = false;
-
   if (esp_now_add_peer(&peerInfo) == ESP_OK) {
     memcpy(knownPeers[peerCount], mac, 6);
     peerCount++;
-
     Serial.print("[ESP-NOW] Peer added: ");
     printMac(mac);
     Serial.println();
@@ -58,6 +49,37 @@ void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 }
 #endif
 
+// NEU (v2): Phase-Nachricht vom Server verarbeiten.
+// Wire-Format (siehe Types.h des Servers):
+//   entries[0].playerId = Phase (0=IDLE, 1=LOBBY, 2=ACTIVE, 3=DONE)
+//   entries[0].points   = Sekunden bis zum nächsten Phasenwechsel
+//   entries[0].player   = Modus-Name (z.B. "free-for-all")
+static void handlePhase(const Message &m) {
+  if (m.playerCount < 1) return;
+  uint8_t newPhase = (uint8_t)m.entries[0].playerId;
+  if (newPhase > PHASE_DONE) return;
+
+  uint8_t prevPhase = g_phase;
+  g_phase = newPhase;
+  g_phaseSecondsLeft = (uint32_t)(m.entries[0].points < 0 ? 0 : m.entries[0].points);
+  g_phaseLastUpdate = millis();
+  strlcpy(g_phaseMode, m.entries[0].player, sizeof(g_phaseMode));
+
+  if (prevPhase != newPhase) {
+    Serial.printf("[PHASE] %u -> %u (%s, %lu s)\n",
+                  prevPhase, newPhase, g_phaseMode, (unsigned long)g_phaseSecondsLeft);
+
+    // Score bei Lobby-Start zurücksetzen (neuer Match-Cycle)
+    if (newPhase == PHASE_LOBBY) {
+      shotsFired = 0;
+      hitCount = 0;
+      myPoints = 0;
+      memset(ranking, 0, sizeof(ranking));
+    }
+    updateDisplay();
+  }
+}
+
 void processIncomingMessage(const uint8_t *srcAddr, const uint8_t *data, int len) {
   if (len != sizeof(Message)) {
     Serial.println("[ESP-NOW] Ignored packet with unexpected size");
@@ -66,39 +88,44 @@ void processIncomingMessage(const uint8_t *srcAddr, const uint8_t *data, int len
 
   Message incoming;
   memcpy(&incoming, data, sizeof(incoming));
-
   addPeer(srcAddr);
 
-  if (incoming.msgType == MSG_DISCOVERY) {
-    Serial.print("[ESP-NOW] Discovery from ");
-    Serial.println(incoming.senderName);
-    queueTableBroadcast();
-    return;
-  }
-
-  if (incoming.msgType == MSG_TABLE) {
-    bool changed = false;
-    for (int i = 0; i < incoming.playerCount && i < MAX_PLAYERS; i++) {
-      if (incoming.entries[i].player[0] == '\0') {
-        continue;
-      }
-
-      if (upsertRankingEntry(incoming.entries[i].playerId,
-                             incoming.entries[i].player,
-                             incoming.entries[i].points,
-                             incoming.entries[i].lastUpdate)) {
-        changed = true;
-      }
-    }
-
-    if (changed) {
-      Serial.print("[ESP-NOW] Ranking update from ");
+  switch (incoming.msgType) {
+    case MSG_DISCOVERY:
+      Serial.print("[ESP-NOW] Discovery from ");
       Serial.println(incoming.senderName);
-      syncMyPointsFromRanking();
-      printRanking();
-      updateDisplay();
       queueTableBroadcast();
+      return;
+
+    case MSG_PHASE:
+      handlePhase(incoming);
+      return;
+
+    case MSG_TABLE: {
+      bool changed = false;
+      for (int i = 0; i < incoming.playerCount && i < MAX_PLAYERS; i++) {
+        if (incoming.entries[i].player[0] == '\0') continue;
+        if (upsertRankingEntry(incoming.entries[i].playerId,
+                               incoming.entries[i].player,
+                               incoming.entries[i].points,
+                               incoming.entries[i].lastUpdate)) {
+          changed = true;
+        }
+      }
+      if (changed) {
+        Serial.print("[ESP-NOW] Ranking update from ");
+        Serial.println(incoming.senderName);
+        syncMyPointsFromRanking();
+        printRanking();
+        updateDisplay();
+        queueTableBroadcast();
+      }
+      return;
     }
+
+    default:
+      Serial.printf("[ESP-NOW] Unknown msgType=%u ignored\n", incoming.msgType);
+      return;
   }
 }
 
@@ -114,12 +141,10 @@ void onDataRecv(const uint8_t *mac, const uint8_t *data, int len) {
 
 void sendDiscovery() {
   const uint8_t broadcast[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-
   memset(&outgoing, 0, sizeof(outgoing));
   strncpy(outgoing.senderName, MY_NAME, sizeof(outgoing.senderName) - 1);
   outgoing.msgType = MSG_DISCOVERY;
   outgoing.playerCount = 0;
-
   esp_now_send(broadcast, reinterpret_cast<const uint8_t *>(&outgoing), sizeof(outgoing));
 }
 
@@ -127,18 +152,13 @@ void broadcastRankingTable() {
   memset(&outgoing, 0, sizeof(outgoing));
   strncpy(outgoing.senderName, MY_NAME, sizeof(outgoing.senderName) - 1);
   outgoing.msgType = MSG_TABLE;
-
   for (int i = 0; i < MAX_PLAYERS; i++) {
     outgoing.entries[i] = ranking[i];
-    if (ranking[i].player[0] != '\0') {
-      outgoing.playerCount++;
-    }
+    if (ranking[i].player[0] != '\0') outgoing.playerCount++;
   }
-
   for (int i = 0; i < peerCount; i++) {
     esp_now_send(knownPeers[i], reinterpret_cast<const uint8_t *>(&outgoing), sizeof(outgoing));
   }
-
   lastTableBroadcast = millis();
   pendingTableBroadcast = false;
 }

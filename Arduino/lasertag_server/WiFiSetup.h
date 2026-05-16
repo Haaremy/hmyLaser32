@@ -3,21 +3,21 @@
 
 #include <Arduino.h>
 
-// Versucht, mit den in NVS gespeicherten WLAN-Credentials zu verbinden.
-// Liefert true bei erfolgreichem STA-Connect.
-bool wifiTryStation();
+// Schaltet das Gerät in AP+STA-Mode. Der AP bleibt PERMANENT aktiv;
+// der STA-Connect ist optional und wird mit gespeicherten Credentials versucht.
+// Liefert true wenn STA verbunden, false wenn nur AP läuft.
+bool wifiBegin();
 
-// Startet den Captive-Portal-AP-Mode (offen) inkl. DNS-Hijack.
-void wifiStartCaptive();
+// Löscht WLAN-Credentials, ohne Reboot.
+void wifiForgetCredentials();
 
-// Stoppt AP, wechselt in STA mit gespeicherten Creds.
-bool wifiSwitchToStationFromStorage();
-
-// Periodischer Tick — DNS + WiFi-Watchdog. In loop() aufrufen.
+// Periodischer Tick (DNS-Hijack + Reconnect-Watchdog).
 void wifiLoop();
 
-// Scan: schreibt JSON-Array ("ssid", "rssi", "secure") nach `out`.
-// `out` muss vom Caller reserviert sein.
+// Erneuter STA-Connect-Versuch (z.B. nach Settings-Update).
+bool wifiTryReconnect();
+
+// JSON-Array umliegender WLANs (synchroner Scan).
 String wifiScanJson();
 
 #endif

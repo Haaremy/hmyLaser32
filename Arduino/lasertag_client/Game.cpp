@@ -17,10 +17,21 @@ bool isPlayerDisabled() {
 }
 
 unsigned long getDisableTimeLeftMs() {
-  if (!isPlayerDisabled()) {
-    return 0;
-  }
+  if (!isPlayerDisabled()) return 0;
   return playerDisabledUntil - millis();
+}
+
+// Effektive Phase: g_phase wenn vor kurzem ein Server-Update kam, sonst
+// ACTIVE — bei fehlendem Server läuft das Spiel als Stand-Alone (alle
+// Phasen werden als ACTIVE behandelt; entspricht dem v1-Verhalten).
+static uint8_t effectivePhase() {
+  if (g_phaseLastUpdate == 0) return PHASE_ACTIVE;
+  if (millis() - g_phaseLastUpdate > PHASE_TIMEOUT_MS) return PHASE_ACTIVE;
+  return g_phase;
+}
+
+bool isShootingAllowed() {
+  return effectivePhase() == PHASE_ACTIVE;
 }
 
 bool handleTrigger() {
@@ -44,6 +55,11 @@ bool handleTrigger() {
         updateDisplay();
         return false;
       }
+      if (!isShootingAllowed()) {
+        Serial.println("[SHOT] Ignored — not in ACTIVE phase");
+        updateDisplay();
+        return false;
+      }
 
       Serial.println("[SHOT] Trigger pressed, sending IR shot");
       const uint32_t myPlayerId = getMyPlayerId();
@@ -64,9 +80,7 @@ bool handleTrigger() {
 }
 
 bool handleIrReceiver() {
-  if (!irrecv.decode(&results)) {
-    return true;
-  }
+  if (!irrecv.decode(&results)) return true;
 
   if (results.decode_type != NEC || results.bits != 32) {
     Serial.println("[IR] Ignored non-NEC or invalid-length frame");
@@ -87,18 +101,13 @@ bool handleIrReceiver() {
     shooterNameCopy[sizeof(shooterNameCopy) - 1] = '\0';
   }
 
-  if (shooterName != nullptr) {
-    Serial.print("[IR] Hit by ");
-    Serial.println(shooterNameCopy);
-  } else {
-    Serial.println("[IR] Unknown shooter ID");
-  }
-
   if (results.address != IR_GAME_ADDRESS) {
     Serial.print("[IR] Ignored foreign NEC address: 0x");
     Serial.println(results.address, HEX);
   } else if (isPlayerDisabled()) {
     Serial.println("[IR] Ignored hit, player currently disabled");
+  } else if (!isShootingAllowed()) {
+    Serial.println("[IR] Ignored hit — not in ACTIVE phase");
   } else if (shooterId == getMyPlayerId() && withinSelfHitWindow) {
     Serial.println("[IR] Ignored own shot during self-hit protection window");
   } else if (shooterId != getMyPlayerId()) {
@@ -107,16 +116,11 @@ bool handleIrReceiver() {
     setLedHitState();
     Serial.print("<< Treffer #");
     Serial.println(hitCount);
-    Serial.print("[GAME] Player disabled for ");
-    Serial.print(HIT_DISABLE_MS / 1000UL);
-    Serial.println(" s");
-
     if (shooterName != nullptr && awardPointsToPlayer(shooterId, shooterNameCopy, 10)) {
       Serial.print("[IR] Awarded 10 points to ");
       Serial.println(shooterNameCopy);
       queueTableBroadcast();
     }
-
     updateDisplay();
   } else {
     Serial.println("[IR] Ignored own player ID");
@@ -128,13 +132,10 @@ bool handleIrReceiver() {
 
 void updateRespawnDisplayState(bool disabledNow, bool &wasPlayerDisabled) {
   if (disabledNow) {
-    if (millis() - lastDisplayRefreshAt >= 150) {
-      updateDisplay();
-    }
+    if (millis() - lastDisplayRefreshAt >= 150) updateDisplay();
   } else if (wasPlayerDisabled) {
     setLedNormalState();
     updateDisplay();
   }
-
   wasPlayerDisabled = disabledNow;
 }

@@ -31,7 +31,8 @@ bool matchStart() {
   memset(g_snapshots, 0, sizeof(g_snapshots));
   g_matchPhase = MATCH_LOBBY;
   g_lobbyEndsAtMs = millis() + g_settings.lobbySeconds * 1000UL;
-  LT_LOG("Lobby phase: %lu s", (unsigned long)g_settings.lobbySeconds);
+  LT_LOG("Lobby phase started (%lu s)", (unsigned long)g_settings.lobbySeconds);
+  espNowBroadcastPhase();   // Clients sofort informieren
   return true;
 }
 
@@ -39,15 +40,15 @@ bool matchEnd() {
   if (g_matchPhase == MATCH_IDLE) return true;
 
   EndPlayer pls[MAX_PLAYERS];
+  static char nfcBuf[MAX_PLAYERS][20];
   int count = 0;
   for (int i = 0; i < MAX_PLAYERS; i++) {
     if (g_snapshots[i].player[0] == '\0') continue;
-    static char nfcBuf[MAX_PLAYERS][20];
     snprintf(nfcBuf[count], sizeof(nfcBuf[count]), "nec:%08lx",
              (unsigned long)g_snapshots[i].playerId);
     pls[count].nfc    = nfcBuf[count];
     pls[count].team   = nullptr;
-    pls[count].hits   = 0;        // Detail-Statistik liefern ESPs in v2
+    pls[count].hits   = 0;
     pls[count].deaths = 0;
     pls[count].points = g_snapshots[i].lastPoints;
     count++;
@@ -55,30 +56,49 @@ bool matchEnd() {
   bool ok = bridgeEndMatch(pls, count);
   g_matchPhase = MATCH_DONE;
   g_currentMatchId[0] = '\0';
+  espNowBroadcastPhase();
   return ok;
 }
 
+bool matchAbort() {
+  // Wie Match-End, aber ohne Cloud-Stats; trotzdem Clients informieren.
+  g_matchPhase = MATCH_IDLE;
+  g_currentMatchId[0] = '\0';
+  memset(g_snapshots, 0, sizeof(g_snapshots));
+  espNowBroadcastPhase();
+  LT_LOG("Match aborted");
+  return true;
+}
+
 void matchLoop() {
+  static unsigned long lastPhaseCast = 0;
+  static MatchPhase lastSent = (MatchPhase)0xFF;
+
   if (g_matchPhase == MATCH_LOBBY) {
     if ((long)(millis() - g_lobbyEndsAtMs) >= 0) {
-      // Lobby vorbei → Match beim Cloud-Portal anmelden
       if (bridgeStartMatch()) {
         g_matchPhase = MATCH_ACTIVE;
         g_matchEndsAtMs = millis() + g_settings.matchSeconds * 1000UL;
         LT_LOG("Match active. matchId=%s end in %lu s",
                g_currentMatchId, (unsigned long)g_settings.matchSeconds);
+        espNowBroadcastPhase();
       } else {
         LT_LOG("bridgeStartMatch failed — retry in 3s");
         g_lobbyEndsAtMs = millis() + 3000;
       }
     }
-    return;
-  }
-
-  if (g_matchPhase == MATCH_ACTIVE) {
+  } else if (g_matchPhase == MATCH_ACTIVE) {
     if ((long)(millis() - g_matchEndsAtMs) >= 0) {
-      LT_LOG("Match duration over — ending.");
+      LT_LOG("Match duration over — ending");
       matchEnd();
     }
+  }
+
+  // Phase periodisch nochmal broadcasten, damit neu hinzukommende Clients
+  // den Status mitbekommen.
+  if (millis() - lastPhaseCast > PHASE_BROADCAST_MS || lastSent != g_matchPhase) {
+    espNowBroadcastPhase();
+    lastPhaseCast = millis();
+    lastSent = g_matchPhase;
   }
 }

@@ -7,8 +7,10 @@
 void espNowBegin();
 void espNowLoop();
 
-// Aktueller Server-seitiger Snapshot (in Globals abgelegt).
-// `out` muss MAX_PLAYERS Slots haben. Liefert Anzahl belegter Einträge.
+// Sendet MSG_PHASE an alle Clients (broadcast).
+void espNowBroadcastPhase();
+
+// Aktueller Server-seitiger Snapshot.
 int espNowGetRanking(PlayerSnapshot *out);
 
 #endif

@@ -1,3 +1,14 @@
+// ============================================================================
+//   hmyLaser32 — Client (Spieler-ESP, v2)
+// ----------------------------------------------------------------------------
+//   v1-Verhalten unverändert + Match-Phase-Awareness:
+//     - Empfängt vom Server-ESP MSG_PHASE (IDLE / LOBBY / ACTIVE / DONE)
+//     - In LOBBY: Display zeigt Countdown, Schüsse werden blockiert
+//     - In ACTIVE: normales Spiel (NEC-IR + ESP-NOW-Ranking)
+//     - In DONE: End-Screen
+//     - Bei fehlendem Server: fällt automatisch auf v1-Stand-Alone zurück
+// ============================================================================
+
 #include <WiFi.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
@@ -37,6 +48,12 @@ bool pendingTableBroadcast = false;
 unsigned long lastTableBroadcast = 0;
 volatile bool sendStatusPending = false;
 volatile esp_now_send_status_t lastSendStatus = ESP_NOW_SEND_FAIL;
+
+// Match-Phase (v2)
+uint8_t  g_phase = PHASE_IDLE;
+uint32_t g_phaseSecondsLeft = 0;
+unsigned long g_phaseLastUpdate = 0;
+char g_phaseMode[16] = "free-for-all";
 
 void setup() {
   Serial.begin(115200);
@@ -79,7 +96,7 @@ void setup() {
   updateMyScore(myPoints);
   syncMyPointsFromRanking();
 
-  Serial.println("Lasertag ESP-NOW ready");
+  Serial.println("Lasertag ESP-NOW ready (v2 phase-aware)");
   Serial.print("[ESP-NOW] My MAC: ");
   Serial.println(WiFi.macAddress());
   updateDisplay();
@@ -90,16 +107,12 @@ void loop() {
   static unsigned long lastDiscovery = 0;
   static unsigned long lastPeriodicBroadcast = 0;
   static bool wasPlayerDisabled = false;
+  static unsigned long lastLobbyTick = 0;
 
   const bool disabledNow = isPlayerDisabled();
 
-  if (!handleTrigger()) {
-    return;
-  }
-
-  if (!handleIrReceiver()) {
-    return;
-  }
+  if (!handleTrigger()) return;
+  if (!handleIrReceiver()) return;
 
   updateRespawnDisplayState(disabledNow, wasPlayerDisabled);
   handleSendStatusLog();
@@ -116,5 +129,11 @@ void loop() {
   if (millis() - lastPeriodicBroadcast > 10000) {
     queueTableBroadcast();
     lastPeriodicBroadcast = millis();
+  }
+
+  // Während Lobby: Display jede Sekunde refreshen für den Countdown
+  if (g_phase == PHASE_LOBBY && millis() - lastLobbyTick > 1000) {
+    lastLobbyTick = millis();
+    updateDisplay();
   }
 }

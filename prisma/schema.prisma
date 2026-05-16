@@ -26,13 +26,24 @@ model User {
 /// `name` + `pin` werden vom ESP generiert; `pin` ist gleichzeitig der Access-Code
 /// für Bridge-API-Calls und Settings-Edit im Web-UI.
 model EspServer {
-  id        String    @id @default(cuid())
-  name      String    @unique
-  pin       String    @unique
-  lastSeen  DateTime?
-  online    Boolean   @default(false)
-  createdAt DateTime  @default(now())
-  matches   Match[]
+  id             String    @id @default(cuid())
+  name           String    @unique
+  pin            String    @unique
+  lastSeen       DateTime?
+  online         Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+
+  // Match-Defaults — vom Webservice pflegbar, ESP pulled regelmäßig
+  mode           String    @default("free-for-all")
+  lobbySeconds   Int       @default(60)
+  matchSeconds   Int       @default(300)
+
+  // Setzt der Webservice auf true, wenn ein Match-Start gewünscht ist.
+  // Der ESP wertet es im nächsten Pull aus und setzt es wieder zurück
+  // (durch Match-Start-API-Call, die Flag auf false setzt).
+  startRequested Boolean   @default(false)
+
+  matches        Match[]
 }
 
 model Match {
