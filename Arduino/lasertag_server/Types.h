@@ -4,9 +4,12 @@
 #include <Arduino.h>
 #include "Config.h"
 
-// Identisches Wire-Format wie der Client (Types.h dort).
-// Beachte: bestehende Clients (v1) kennen nur MSG_DISCOVERY und MSG_TABLE.
-// Neue Clients (v2) verstehen MSG_PHASE.
+// ============================================================================
+// ESP-NOW Wire-Format — IDENTISCH zum Client. Bei jeder Änderung Client mit-
+// migrieren! Struktur-Size darf nicht wachsen, damit alte Geräte nicht crashen
+// (sie ignorieren unbekannte msgType-Werte).
+// ============================================================================
+
 struct __attribute__((packed)) RankingEntry {
   uint32_t playerId;
   char     player[12];
@@ -16,23 +19,29 @@ struct __attribute__((packed)) RankingEntry {
 
 struct __attribute__((packed)) Message {
   char        senderName[12];
-  uint8_t     msgType;          // 0 = DISCOVERY, 1 = TABLE, 2 = PHASE
+  uint8_t     msgType;
   uint8_t     playerCount;
   RankingEntry entries[MAX_PLAYERS];
 };
 
+// Message types
 constexpr uint8_t MSG_DISCOVERY = 0;
 constexpr uint8_t MSG_TABLE     = 1;
 constexpr uint8_t MSG_PHASE     = 2;
+constexpr uint8_t MSG_TEAMS     = 3;   // NEU v3
 
-// Phase-Nachricht: wir benutzen die `entries`-Slots zweckentfremdet,
-// damit das Wire-Format stabil bleibt. entries[0].playerId enthält die Phase,
-// entries[0].points enthält die Restzeit in Sekunden.
-//   entries[0].playerId : MatchPhase (0=IDLE, 1=LOBBY, 2=ACTIVE, 3=DONE)
+// MSG_PHASE slot mapping
+//   entries[0].playerId : MatchPhase (0..3)
 //   entries[0].points   : Sekunden bis zum nächsten Phasenwechsel
-//   entries[0].player   : Modus-Name (z.B. "free-for-all")
+//   entries[0].player   : Modus-Name (z.B. "free-for-all" / "team")
 
-// Lokaler Snapshot zum Diff-Detect
+// MSG_TEAMS slot mapping (eine RankingEntry-Slot pro Team):
+//   entries[i].player     : Team-Name (12 byte)
+//   entries[i].playerId   : RGB-Farbe als 0x00RRGGBB
+//   entries[i].lastUpdate : Member-Bitmask (Bit n = MY_IR_COMMAND n+1 gehört zum Team)
+//                           also Bit 0 = command 0x01, Bit 1 = 0x02, ..., Bit 31 = 0x20
+//   entries[i].points     : 0 (reserviert)
+
 struct PlayerSnapshot {
   uint32_t playerId;
   char     player[12];
@@ -47,10 +56,18 @@ enum MatchPhase : uint8_t {
   MATCH_DONE   = 3
 };
 
+struct TeamDef {
+  char     name[12];
+  uint32_t color;         // 0x00RRGGBB
+  uint32_t memberBits;    // Bit n = MY_IR_COMMAND (n+1) ist im Team
+};
+
 struct MatchSettings {
-  char     mode[24];
+  char     mode[24];          // "free-for-all" | "team"
   uint32_t lobbySeconds;
   uint32_t matchSeconds;
+  uint8_t  teamCount;
+  TeamDef  teams[MAX_TEAMS];
 };
 
 #endif

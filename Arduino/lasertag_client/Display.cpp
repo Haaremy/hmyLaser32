@@ -22,18 +22,16 @@ static const char *phaseLabel() {
   }
 }
 
+static const char *myTeamName() {
+  bool teamsFresh = g_teamCount > 0 && (millis() - g_teamsLastUpdate) < TEAMS_TIMEOUT_MS;
+  if (teamsFresh && g_myTeamIndex >= 0 && g_myTeamIndex < (int)g_teamCount) {
+    return g_teams[g_myTeamIndex].name;
+  }
+  return nullptr;
+}
+
 void updateDisplay() {
   lastDisplayRefreshAt = millis();
-
-  Serial.print("[STATS] Shots: ");
-  Serial.print(shotsFired);
-  Serial.print(" Hits received: ");
-  Serial.print(hitCount);
-  Serial.print(" Points: ");
-  Serial.print(myPoints);
-  Serial.print(" Rank: ");
-  Serial.println(getMyRank());
-
   char line[24];
   u8g2.clearBuffer();
 
@@ -61,10 +59,15 @@ void updateDisplay() {
       u8g2.drawStr(40, 44, line);
     }
   } else if (g_phase == PHASE_LOBBY && (millis() - g_phaseLastUpdate) < PHASE_TIMEOUT_MS) {
-    // Lobby-Phase: Countdown anzeigen
     u8g2.drawStr(0, 0, "LOBBY");
     u8g2.drawStr(48, 0, g_phaseMode);
-    u8g2.drawStr(0, 18, "Verteilen...");
+    const char *tn = myTeamName();
+    if (tn) {
+      snprintf(line, sizeof(line), "Team: %s", tn);
+      u8g2.drawStr(0, 18, line);
+    } else {
+      u8g2.drawStr(0, 18, "Verteilen...");
+    }
     long left = (long)g_phaseSecondsLeft - (long)((millis() - g_phaseLastUpdate) / 1000UL);
     if (left < 0) left = 0;
     snprintf(line, sizeof(line), "Start in %lds", left);
@@ -78,23 +81,31 @@ void updateDisplay() {
     u8g2.drawStr(0, 32, line);
     u8g2.drawStr(0, 50, MY_NAME);
   } else {
-    // ACTIVE oder Stand-Alone (kein Server)
     u8g2.drawStr(0, 0, MY_NAME);
     u8g2.drawStr(86, 0, phaseLabel());
 
-    snprintf(line, sizeof(line), "Pts: %d", myPoints);
-    u8g2.drawStr(0, 14, line);
-
-    snprintf(line, sizeof(line), "Hits rx: %d", hitCount);
-    u8g2.drawStr(0, 28, line);
-
-    snprintf(line, sizeof(line), "Shots: %d", shotsFired);
-    u8g2.drawStr(0, 42, line);
-
-    int rank = getMyRank();
-    snprintf(line, sizeof(line), "Rank: %d", rank);
-    u8g2.drawStr(0, 56, line);
+    const char *tn = myTeamName();
+    if (tn) {
+      snprintf(line, sizeof(line), "Team: %s", tn);
+      u8g2.drawStr(0, 14, line);
+      snprintf(line, sizeof(line), "Pts: %d", myPoints);
+      u8g2.drawStr(0, 28, line);
+      snprintf(line, sizeof(line), "Hits rx: %d  Shots: %d", hitCount, shotsFired);
+      u8g2.drawStr(0, 42, line);
+      int rank = getMyRank();
+      snprintf(line, sizeof(line), "Rank: %d", rank);
+      u8g2.drawStr(0, 56, line);
+    } else {
+      snprintf(line, sizeof(line), "Pts: %d", myPoints);
+      u8g2.drawStr(0, 14, line);
+      snprintf(line, sizeof(line), "Hits rx: %d", hitCount);
+      u8g2.drawStr(0, 28, line);
+      snprintf(line, sizeof(line), "Shots: %d", shotsFired);
+      u8g2.drawStr(0, 42, line);
+      int rank = getMyRank();
+      snprintf(line, sizeof(line), "Rank: %d", rank);
+      u8g2.drawStr(0, 56, line);
+    }
   }
-
   u8g2.sendBuffer();
 }

@@ -34,10 +34,16 @@ extern unsigned long lastTableBroadcast;
 extern volatile bool sendStatusPending;
 extern volatile esp_now_send_status_t lastSendStatus;
 
-// --- Match-Phase (NEU v2 — vom Server via MSG_PHASE broadcastet) ----------
-extern uint8_t  g_phase;             // PHASE_IDLE / LOBBY / ACTIVE / DONE
-extern uint32_t g_phaseSecondsLeft;  // Sekunden bis nächster Phasenwechsel
-extern unsigned long g_phaseLastUpdate; // millis() bei letztem Server-Update
-extern char     g_phaseMode[16];     // Match-Modus-Bezeichnung
+// --- Match-Phase (v2) ------------------------------------------------------
+extern uint8_t  g_phase;
+extern uint32_t g_phaseSecondsLeft;
+extern unsigned long g_phaseLastUpdate;
+extern char     g_phaseMode[16];
+
+// --- Teams (v3) -----------------------------------------------------------
+extern TeamDef  g_teams[MAX_TEAMS];
+extern uint8_t  g_teamCount;
+extern int8_t   g_myTeamIndex;          // -1 wenn keinem Team zugeordnet
+extern unsigned long g_teamsLastUpdate;
 
 #endif

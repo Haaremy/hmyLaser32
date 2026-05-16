@@ -13,6 +13,10 @@ void matchLoadSettings() {
   strlcpy(g_settings.mode, mode.c_str(), sizeof(g_settings.mode));
   g_settings.lobbySeconds = lobby;
   g_settings.matchSeconds = mlen;
+  // teams werden NICHT aus NVS persistiert — sie kommen via Settings-Pull
+  // vom Webservice (Source of Truth). Lokale Änderungen sind ephemer.
+  g_settings.teamCount = 0;
+  memset(g_settings.teams, 0, sizeof(g_settings.teams));
   LT_LOG("Settings: mode=%s lobby=%lu match=%lu",
          g_settings.mode, (unsigned long)g_settings.lobbySeconds, (unsigned long)g_settings.matchSeconds);
 }
@@ -32,13 +36,13 @@ bool matchStart() {
   g_matchPhase = MATCH_LOBBY;
   g_lobbyEndsAtMs = millis() + g_settings.lobbySeconds * 1000UL;
   LT_LOG("Lobby phase started (%lu s)", (unsigned long)g_settings.lobbySeconds);
-  espNowBroadcastPhase();   // Clients sofort informieren
+  espNowBroadcastTeams();   // Teams sofort an Clients
+  espNowBroadcastPhase();   // Phase sofort
   return true;
 }
 
 bool matchEnd() {
   if (g_matchPhase == MATCH_IDLE) return true;
-
   EndPlayer pls[MAX_PLAYERS];
   static char nfcBuf[MAX_PLAYERS][20];
   int count = 0;
@@ -61,7 +65,6 @@ bool matchEnd() {
 }
 
 bool matchAbort() {
-  // Wie Match-End, aber ohne Cloud-Stats; trotzdem Clients informieren.
   g_matchPhase = MATCH_IDLE;
   g_currentMatchId[0] = '\0';
   memset(g_snapshots, 0, sizeof(g_snapshots));
@@ -72,7 +75,8 @@ bool matchAbort() {
 
 void matchLoop() {
   static unsigned long lastPhaseCast = 0;
-  static MatchPhase lastSent = (MatchPhase)0xFF;
+  static unsigned long lastTeamsCast = 0;
+  static MatchPhase    lastSent = (MatchPhase)0xFF;
 
   if (g_matchPhase == MATCH_LOBBY) {
     if ((long)(millis() - g_lobbyEndsAtMs) >= 0) {
@@ -94,11 +98,18 @@ void matchLoop() {
     }
   }
 
-  // Phase periodisch nochmal broadcasten, damit neu hinzukommende Clients
-  // den Status mitbekommen.
   if (millis() - lastPhaseCast > PHASE_BROADCAST_MS || lastSent != g_matchPhase) {
     espNowBroadcastPhase();
     lastPhaseCast = millis();
     lastSent = g_matchPhase;
+  }
+
+  // Teams re-broadcasten während Lobby + Active (damit Clients, die später
+  // anschalten, das Team noch erfahren)
+  if (g_settings.teamCount > 0 &&
+      (g_matchPhase == MATCH_LOBBY || g_matchPhase == MATCH_ACTIVE) &&
+      millis() - lastTeamsCast > TEAMS_BROADCAST_MS) {
+    espNowBroadcastTeams();
+    lastTeamsCast = millis();
   }
 }

@@ -1,12 +1,8 @@
 // ============================================================================
-//   hmyLaser32 — Client (Spieler-ESP, v2)
-// ----------------------------------------------------------------------------
-//   v1-Verhalten unverändert + Match-Phase-Awareness:
-//     - Empfängt vom Server-ESP MSG_PHASE (IDLE / LOBBY / ACTIVE / DONE)
-//     - In LOBBY: Display zeigt Countdown, Schüsse werden blockiert
-//     - In ACTIVE: normales Spiel (NEC-IR + ESP-NOW-Ranking)
-//     - In DONE: End-Screen
-//     - Bei fehlendem Server: fällt automatisch auf v1-Stand-Alone zurück
+//   hmyLaser32 — Client (Spieler-ESP, v3)
+//   v1: stand-alone IR/ESP-NOW Gossip
+//   v2: + Match-Phase-Awareness via MSG_PHASE
+//   v3: + Team-Mode via MSG_TEAMS (RGB-LED + OLED zeigen Team)
 // ============================================================================
 
 #include <WiFi.h>
@@ -49,11 +45,17 @@ unsigned long lastTableBroadcast = 0;
 volatile bool sendStatusPending = false;
 volatile esp_now_send_status_t lastSendStatus = ESP_NOW_SEND_FAIL;
 
-// Match-Phase (v2)
+// Phase (v2)
 uint8_t  g_phase = PHASE_IDLE;
 uint32_t g_phaseSecondsLeft = 0;
 unsigned long g_phaseLastUpdate = 0;
 char g_phaseMode[16] = "free-for-all";
+
+// Teams (v3)
+TeamDef g_teams[MAX_TEAMS] = {};
+uint8_t g_teamCount = 0;
+int8_t  g_myTeamIndex = -1;
+unsigned long g_teamsLastUpdate = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -78,10 +80,7 @@ void setup() {
   WiFi.disconnect();
   esp_wifi_set_channel(WIFI_CHANNEL, WIFI_SECOND_CHAN_NONE);
 
-  if (esp_now_init() != ESP_OK) {
-    Serial.println("[ESP-NOW] Init failed");
-    return;
-  }
+  if (esp_now_init() != ESP_OK) { Serial.println("[ESP-NOW] Init failed"); return; }
 
   esp_now_register_send_cb(onDataSent);
   esp_now_register_recv_cb(onDataRecv);
@@ -96,7 +95,7 @@ void setup() {
   updateMyScore(myPoints);
   syncMyPointsFromRanking();
 
-  Serial.println("Lasertag ESP-NOW ready (v2 phase-aware)");
+  Serial.println("Lasertag ESP-NOW ready (v3 team aware)");
   Serial.print("[ESP-NOW] My MAC: ");
   Serial.println(WiFi.macAddress());
   updateDisplay();
@@ -110,7 +109,6 @@ void loop() {
   static unsigned long lastLobbyTick = 0;
 
   const bool disabledNow = isPlayerDisabled();
-
   if (!handleTrigger()) return;
   if (!handleIrReceiver()) return;
 
@@ -121,17 +119,13 @@ void loop() {
     sendDiscovery();
     lastDiscovery = millis();
   }
-
   if (pendingTableBroadcast && millis() - lastTableBroadcast > 300) {
     broadcastRankingTable();
   }
-
   if (millis() - lastPeriodicBroadcast > 10000) {
     queueTableBroadcast();
     lastPeriodicBroadcast = millis();
   }
-
-  // Während Lobby: Display jede Sekunde refreshen für den Countdown
   if (g_phase == PHASE_LOBBY && millis() - lastLobbyTick > 1000) {
     lastLobbyTick = millis();
     updateDisplay();

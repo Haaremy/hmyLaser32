@@ -4,6 +4,7 @@
 #include "Display.h"
 #include "Globals.h"
 #include "LasertagNetwork.h"
+#include "Led.h"
 #include "Ranking.h"
 
 bool peerExists(const uint8_t *mac) {
@@ -49,11 +50,6 @@ void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 }
 #endif
 
-// NEU (v2): Phase-Nachricht vom Server verarbeiten.
-// Wire-Format (siehe Types.h des Servers):
-//   entries[0].playerId = Phase (0=IDLE, 1=LOBBY, 2=ACTIVE, 3=DONE)
-//   entries[0].points   = Sekunden bis zum nächsten Phasenwechsel
-//   entries[0].player   = Modus-Name (z.B. "free-for-all")
 static void handlePhase(const Message &m) {
   if (m.playerCount < 1) return;
   uint8_t newPhase = (uint8_t)m.entries[0].playerId;
@@ -68,16 +64,33 @@ static void handlePhase(const Message &m) {
   if (prevPhase != newPhase) {
     Serial.printf("[PHASE] %u -> %u (%s, %lu s)\n",
                   prevPhase, newPhase, g_phaseMode, (unsigned long)g_phaseSecondsLeft);
-
-    // Score bei Lobby-Start zurücksetzen (neuer Match-Cycle)
     if (newPhase == PHASE_LOBBY) {
       shotsFired = 0;
       hitCount = 0;
       myPoints = 0;
       memset(ranking, 0, sizeof(ranking));
     }
+    // Wenn das neue Phase nicht Team-Mode-relevant ist und keine Teams
+    // vom Server kommen, LED auf weiß zurücksetzen (siehe Led.cpp::applyTeamColor)
+    applyTeamColor();
     updateDisplay();
   }
+}
+
+static void handleTeams(const Message &m) {
+  g_teamCount = m.playerCount > MAX_TEAMS ? MAX_TEAMS : m.playerCount;
+  g_myTeamIndex = -1;
+  uint32_t myBit = (MY_IR_COMMAND >= 1 && MY_IR_COMMAND <= 32) ? (1u << (MY_IR_COMMAND - 1)) : 0u;
+  for (uint8_t i = 0; i < g_teamCount; i++) {
+    strlcpy(g_teams[i].name, m.entries[i].player, sizeof(g_teams[i].name));
+    g_teams[i].color      = m.entries[i].playerId & 0x00FFFFFFu;
+    g_teams[i].memberBits = m.entries[i].lastUpdate;
+    if (myBit && (g_teams[i].memberBits & myBit)) g_myTeamIndex = (int8_t)i;
+  }
+  g_teamsLastUpdate = millis();
+  Serial.printf("[TEAMS] %u teams; myIndex=%d\n", g_teamCount, g_myTeamIndex);
+  applyTeamColor();
+  updateDisplay();
 }
 
 void processIncomingMessage(const uint8_t *srcAddr, const uint8_t *data, int len) {
@@ -85,7 +98,6 @@ void processIncomingMessage(const uint8_t *srcAddr, const uint8_t *data, int len
     Serial.println("[ESP-NOW] Ignored packet with unexpected size");
     return;
   }
-
   Message incoming;
   memcpy(&incoming, data, sizeof(incoming));
   addPeer(srcAddr);
@@ -101,6 +113,10 @@ void processIncomingMessage(const uint8_t *srcAddr, const uint8_t *data, int len
       handlePhase(incoming);
       return;
 
+    case MSG_TEAMS:
+      handleTeams(incoming);
+      return;
+
     case MSG_TABLE: {
       bool changed = false;
       for (int i = 0; i < incoming.playerCount && i < MAX_PLAYERS; i++) {
@@ -113,8 +129,6 @@ void processIncomingMessage(const uint8_t *srcAddr, const uint8_t *data, int len
         }
       }
       if (changed) {
-        Serial.print("[ESP-NOW] Ranking update from ");
-        Serial.println(incoming.senderName);
         syncMyPointsFromRanking();
         printRanking();
         updateDisplay();

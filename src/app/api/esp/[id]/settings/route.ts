@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
+import { parseTeams, teamsSchema } from '@/lib/teams';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// PIN-Auth: entweder Bearer oder body.pin
 async function authServer(req: Request, id: string, bodyPin?: string) {
   const auth = req.headers.get('authorization');
   let pin = bodyPin?.trim() || '';
@@ -16,32 +17,31 @@ async function authServer(req: Request, id: string, bodyPin?: string) {
   return server.pin === pin ? server : null;
 }
 
-// GET — Settings lesen (öffentlich; jeder kann die Defaults sehen)
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const server = await db.espServer.findUnique({
     where: { id: params.id },
     select: {
       id: true, name: true, mode: true, lobbySeconds: true, matchSeconds: true,
-      startRequested: true, lastSeen: true, online: true
+      teams: true, startRequested: true, lastSeen: true, online: true
     }
   });
   if (!server) return NextResponse.json({ error: 'not_found' }, { status: 404 });
-  return NextResponse.json(server);
+  return NextResponse.json({ ...server, teams: parseTeams(server.teams) });
 }
 
 const schema = z.object({
   pin: z.string().min(4).max(32),
-  mode: z.string().min(1).max(23).optional(),
+  mode: z.enum(['free-for-all', 'team']).optional(),
   lobbySeconds: z.number().int().min(5).max(600).optional(),
-  matchSeconds: z.number().int().min(30).max(3600).optional()
+  matchSeconds: z.number().int().min(30).max(3600).optional(),
+  teams: teamsSchema.optional()
 });
 
-// POST — Settings ändern (PIN-gated)
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   let body: z.infer<typeof schema>;
   try {
     body = schema.parse(await req.json());
-  } catch {
+  } catch (e) {
     return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
   }
   const server = await authServer(req, params.id, body.pin);
@@ -52,9 +52,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     data: {
       mode: body.mode ?? server.mode,
       lobbySeconds: body.lobbySeconds ?? server.lobbySeconds,
-      matchSeconds: body.matchSeconds ?? server.matchSeconds
+      matchSeconds: body.matchSeconds ?? server.matchSeconds,
+      teams: body.teams !== undefined ? (body.teams as Prisma.InputJsonValue) : undefined
     },
-    select: { id: true, mode: true, lobbySeconds: true, matchSeconds: true }
+    select: { id: true, mode: true, lobbySeconds: true, matchSeconds: true, teams: true }
   });
-  return NextResponse.json({ ok: true, ...updated });
+  return NextResponse.json({ ok: true, ...updated, teams: parseTeams(updated.teams) });
 }

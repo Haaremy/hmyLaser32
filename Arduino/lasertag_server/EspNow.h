@@ -7,10 +7,12 @@
 void espNowBegin();
 void espNowLoop();
 
-// Sendet MSG_PHASE an alle Clients (broadcast).
+// Phase-Broadcast (current match phase + remaining seconds).
 void espNowBroadcastPhase();
 
-// Aktueller Server-seitiger Snapshot.
+// Teams-Broadcast (current team definitions). Wirkt nur, wenn g_settings.teamCount > 0.
+void espNowBroadcastTeams();
+
 int espNowGetRanking(PlayerSnapshot *out);
 
 #endif

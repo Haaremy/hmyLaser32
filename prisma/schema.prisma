@@ -34,13 +34,18 @@ model EspServer {
   createdAt      DateTime  @default(now())
 
   // Match-Defaults — vom Webservice pflegbar, ESP pulled regelmäßig
+  // mode: "free-for-all" | "team"
   mode           String    @default("free-for-all")
-  lobbySeconds   Int       @default(60)
-  matchSeconds   Int       @default(300)
+  lobbySeconds   Int       @default(60)   // Starttimer (Verteilzeit)
+  matchSeconds   Int       @default(300)  // Runden-Dauer
+
+  // Teams-Definition für mode="team". JSON-Array:
+  //   [{ "name": "Rot", "color": "#dc2626", "members": [1, 3, 5] }, ...]
+  // members = NEC-Command-IDs (MY_IR_COMMAND in der Client-Config)
+  teams          Json?
 
   // Setzt der Webservice auf true, wenn ein Match-Start gewünscht ist.
-  // Der ESP wertet es im nächsten Pull aus und setzt es wieder zurück
-  // (durch Match-Start-API-Call, die Flag auf false setzt).
+  // Der ESP wertet es im nächsten Pull aus und setzt es wieder zurück.
   startRequested Boolean   @default(false)
 
   matches        Match[]
