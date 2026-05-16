@@ -3,6 +3,7 @@
 #include "Config.h"
 #include "Game.h"
 #include "Globals.h"
+#include "Identity.h"
 
 int findPlayerIndexById(uint32_t playerId) {
   for (int i = 0; i < MAX_PLAYERS; i++) {
@@ -91,7 +92,7 @@ void queueTableBroadcast() {
 }
 
 void updateMyScore(int points) {
-  if (upsertRankingEntry(getMyPlayerId(), MY_NAME, points, millis())) {
+  if (upsertRankingEntry(getMyPlayerId(), identityMyName(), points, millis())) {
     queueTableBroadcast();
   }
 }
