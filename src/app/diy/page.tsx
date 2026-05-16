@@ -33,20 +33,26 @@ const components: Component[] = [
   {
     name: 'Taster (Mikroschalter)',
     qty: '1×',
-    hint: 'Auslöseknopf an Pistole. Pull-Up auf GPIO 19.',
+    hint: 'Auslöseknopf an Pistole. Pull-Up auf GPIO 32 (default v4.2). Alternativ GPIO 19 wenn kein NFC.',
     source: 'https://www.amazon.de/dp/B07XWYHPZH'
   },
   {
-    name: '5 mm RGB-LED, gemeinsame Kathode',
+    name: 'WS2812B-LED-Streifen (30 LEDs)',
     qty: '1×',
-    hint: 'Status-LED am Brustmodul. 3 PWM-Pins (25/26/27).',
+    hint: 'Adressierbar, eine Datenleitung an GPIO 26. Versorgung 5 V direkt von der Powerbank (VIN). Bei 20+ LEDs Level-Shifter (74HCT245) auf der Datenleitung empfehlenswert. Spielerfarbe / Teamfarbe / Hit-Blink über den ganzen Streifen.',
     source: 'https://www.amazon.de/dp/B0897LDR9N'
   },
   {
-    name: 'Widerstand 330 Ω',
-    qty: '3×',
-    hint: 'Vorwiderstand pro Farbkanal der RGB-LED.',
-    source: 'https://www.reichelt.de/de/de/widerstand-1-4-w-5-330-ohm-1-4w-330-p1408.html'
+    name: 'Level-Shifter 74HCT245 (empfohlen)',
+    qty: '1×',
+    hint: '3,3 V → 5 V auf der WS2812B-Datenleitung. Für längere Streifen (20+ LEDs) gegen Flicker. Alternative: 470 Ω-Widerstand in Serie auf der Datenleitung als billiger Hack.',
+    source: 'https://www.reichelt.de/de/de/inhalt.html?ACTION=446&q=74hct245'
+  },
+  {
+    name: 'Elko 1000 µF / 6,3 V (optional)',
+    qty: '1×',
+    hint: 'Zwischen +5 V und GND am Streifen-Anfang gegen Strom-Spikes beim Einschalten.',
+    source: 'https://www.reichelt.de/de/de/inhalt.html?ACTION=446&q=elko%201000uF%206.3V'
   },
   {
     name: 'Powerbank 5 V USB',
@@ -121,12 +127,16 @@ const steps = [
           <tbody>
             <tr><td className="num">4</td><td>IR-Sender Out</td><td>KY-005 Signal</td></tr>
             <tr><td className="num">14</td><td>IR-Receiver In</td><td>TSOP38238 Signal</td></tr>
-            <tr><td className="num">19</td><td>Button (Pull-Up)</td><td>Auslöseknopf</td></tr>
+            <tr><td className="num">32</td><td>Button (Pull-Up)</td><td>Auslöseknopf</td></tr>
             <tr><td className="num">21</td><td>I²C SDA</td><td>OLED</td></tr>
             <tr><td className="num">22</td><td>I²C SCL</td><td>OLED</td></tr>
-            <tr><td className="num">25/26/27</td><td>PWM R/G/B</td><td>RGB-LED über 330 Ω</td></tr>
+            <tr><td className="num">26</td><td>WS2812B Data</td><td>LED-Streifen DIN (über 470 Ω oder Level-Shifter)</td></tr>
+            <tr><td>VIN / 5V</td><td>5 V Passthrough</td><td>WS2812B +5 V (USB-Powerbank)</td></tr>
           </tbody>
         </table>
+        <p style={{ fontSize: 'var(--hmy-font-size-sm)', color: 'var(--hmy-color-text-muted)' }}>
+          Hinweis: GPIO 19 ist im v4.2-Default frei, damit ein optionaler MFRC522-NFC-Reader die VSPI-Pins (18 / 19 / 23 / 5) nutzen kann. Wer keinen NFC-Reader baut, kann den Button alternativ auf GPIO 19 setzen (<code className="hmy-code">BUTTON_PIN</code> in <code className="hmy-code">Config.h</code>).
+        </p>
       </>
     )
   },
@@ -137,14 +147,15 @@ const steps = [
         <p>
           Das Client-Sketch <code className="hmy-code">Arduino/lasertag_client/lasertag_client.ino</code> aus
           dem <a href="https://github.com/Haaremy/hmyLaser32/tree/main/Arduino" rel="noopener noreferrer">GitHub-Repo</a> öffnen.
-          In <code className="hmy-code">Config.h</code> Spielerdaten setzen — pro Gerät eindeutig:
+          Ab v4 brauchst du <strong>nichts</strong> mehr pro Gerät zu konfigurieren — Name + Farbe
+          + NEC-Command werden beim Lobby-Eintritt aus der MAC-Adresse ausgehandelt.
         </p>
-        <pre>{`constexpr char MY_NAME[]      = "PLAYER_1";  // pro ESP unterschiedlich
-constexpr uint8_t MY_IR_COMMAND = 0x01;       // 0x01..0xFE pro Gerät`}</pre>
         <p>
+          Benötigte Libraries: <code className="hmy-code">IRremoteESP8266</code>,{' '}
+          <code className="hmy-code">U8g2</code>, <code className="hmy-code">FastLED</code>.
           Flashen mit <strong>Erase all Flash on upload = true</strong>, Upload-Speed 115 200,
-          Flash 40 MHz. Auf dem OLED sollte Name + Score erscheinen. Button drücken →
-          IR-LED blinkt kurz, OLED zeigt Schüsse hoch.
+          Flash 40 MHz. Auf dem OLED sollte „Suche Mitspieler…" erscheinen, sobald ein 2. ESP
+          dabei ist springt der Client in die Lobby.
         </p>
       </>
     )
@@ -155,8 +166,11 @@ constexpr uint8_t MY_IR_COMMAND = 0x01;       // 0x01..0xFE pro Gerät`}</pre>
       <p>
         Wenn der Prototyp läuft: alles auf eine Lochplatine übertragen.
         Sauberes Löten ist hier entscheidend — schlechte GND-Verbindungen sind
-        die häufigste Fehlerquelle. Die RGB-LED-Kathode (längster Pin) an GND, die
-        drei Farb-Pins über je 330 Ω an GPIO 25 / 26 / 27.
+        die häufigste Fehlerquelle. Den WS2812B-Streifen verkabeln: <strong>DIN</strong> über
+        einen 470 Ω-Widerstand (oder Level-Shifter 74HCT245) an GPIO 26,{' '}
+        <strong>+5 V</strong> an den VIN-Pin (5 V-USB-Passthrough vom Powerbank),
+        <strong> GND</strong> an GND. Bei 20+ LEDs zusätzlich einen 1000 µF-Elko
+        zwischen +5 V und GND am Streifen-Anfang.
       </p>
     )
   },

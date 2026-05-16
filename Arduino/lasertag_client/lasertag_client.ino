@@ -88,9 +88,11 @@ void setup() {
   u8g2.sendBuffer();
 
   pinMode(BUTTON_PIN, INPUT_PULLUP);
+#if !USE_WS2812
   pinMode(RGB_RED_PIN, OUTPUT);
   pinMode(RGB_GREEN_PIN, OUTPUT);
   pinMode(RGB_BLUE_PIN, OUTPUT);
+#endif
   setLedNormalState();
   irsend.begin();
   irrecv.enableIRIn();

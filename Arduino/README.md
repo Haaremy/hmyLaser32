@@ -35,11 +35,14 @@ Arduino/
 | TSOP38238 | IR receiver, 38 kHz, up to ~45 m range |
 | KY-005 | IR emitter at 940 nm, drives directly from a GPIO |
 | SSD1306 OLED 0.96″ I²C | 128 × 64 px status display |
-| Momentary push button | Trigger, pull-up via internal resistor on GPIO 19 |
-| 5 mm RGB LED, **common cathode** | Status LED on the chest |
-| 3 × 330 Ω resistor | One per RGB channel |
-| USB powerbank (5 V) | Power supply, ~6 h with a small cell |
+| Momentary push button | Trigger, pull-up via internal resistor on GPIO 32 (default v4.2). Can be moved back to GPIO 19 if no NFC is used. |
+| **WS2812B LED strip (30 LEDs)** | Status strip on the chest. One data line on GPIO 26, 5 V from VIN, GND. Default v4.2. |
+| 74HCT245 level-shifter (recommended) | 3.3 V → 5 V on the WS2812B data line for strips > 10 LEDs. Alternative: 470 Ω resistor in series. |
+| 1000 µF / 6.3 V capacitor (optional) | Between +5 V and GND at the strip start, against current spikes. |
+| USB powerbank (5 V) | Power supply, ~6 h with a small cell. ESP draws ~200 mA, WS2812B adds up to ~50 mA per LED at full white. |
 | Hookup wire + solder | Final assembly on perfboard |
+| *(optional)* MFRC522 NFC reader | Account binding via NFC card. SPI on VSPI pins 18 / 19 / 23 / 5, RST on 33. |
+| *(legacy)* 5 mm RGB LED + 3 × 330 Ω | Pre-v4.2: single RGB LED on GPIO 25 / 26 / 27. Use `#define USE_WS2812 0` to keep this mode. |
 
 ### Server (`lasertag_server`)
 
@@ -55,28 +58,42 @@ Arduino/
 
 ---
 
-## Pin assignment
+## Pin assignment (v4.2 default — WS2812B strip + auto-identity)
 
 ```
 ESP32 NodeMCU-32S
                  ┌───────────────────────────┐
                  │                           │
-       3V3 ──────┤ 3.3 V                   ◙ │ → OLED VCC, TSOP VCC, KY-005 VCC
-       GND ──────┤ GND                       │ → OLED GND, TSOP GND, KY-005 GND, RGB cathode (common)
+       3V3 ──────┤ 3.3 V                     │ → OLED VCC, TSOP VCC, KY-005 VCC
+       VIN ──────┤ 5 V passthrough           │ → WS2812B +5 V (from USB powerbank)
+       GND ──────┤ GND                       │ → all components common GND
                  │                           │
-   IR-Sender ──◄─┤ GPIO 4   (IR_SEND_PIN)    │
+   IR-Sender ──◄─┤ GPIO  4  (IR_SEND_PIN)    │
    IR-Recv  ──►──┤ GPIO 14  (IR_RECV_PIN)    │
-   Button ──►────┤ GPIO 19  (BUTTON_PIN)     │ INPUT_PULLUP
+   Button ──►────┤ GPIO 32  (BUTTON_PIN)     │ INPUT_PULLUP
                  │                           │
    OLED SDA ─────┤ GPIO 21  (I²C SDA)        │
    OLED SCL ─────┤ GPIO 22  (I²C SCL)        │
                  │                           │
-   RGB-R ─330Ω──►┤ GPIO 25  (PWM R)          │
-   RGB-G ─330Ω──►┤ GPIO 26  (PWM G)          │
-   RGB-B ─330Ω──►┤ GPIO 27  (PWM B)          │
+   LED Strip DIN ◄┤ GPIO 26 (LED_DATA_PIN)   │ → via 470 Ω or 74HCT245 level-shifter
+                 │                           │
+   (free for     │ GPIO 19 — if no NFC, you  │
+    optional NFC)│   may put BUTTON_PIN here │
                  │                           │
                  └───────────────────────────┘
 ```
+
+Notes:
+- **5 V supply for the strip**: take it from the `VIN` (`5V`) pin, which
+  is the USB-input passthrough. A typical NodeMCU-32S can pass ~500 mA;
+  for a 30-LED strip at low brightness (the firmware caps at 80/255)
+  total draw stays well under the powerbank limit.
+- **Level shifter**: WS2812B expects ~5 V logic on the data line; the
+  ESP32 outputs 3.3 V. For 10+ LEDs add a 74HCT245 or use the cheap
+  "sacrifice the first LED as level shifter" trick (470 Ω resistor in
+  series is the quickest workaround).
+- **Legacy 3-pin RGB LED**: still supported. Set `#define USE_WS2812 0`
+  in `Config.h` to re-enable the GPIO 25 / 26 / 27 PWM mode.
 
 All pins are defined in `Arduino/lasertag_client/Config.h` and can be moved
 to any free GPIO (mind ADC2 conflicts when WiFi is active).
@@ -91,6 +108,8 @@ Install via the Arduino IDE Library Manager.
 |---|---|---|
 | `IRremoteESP8266` | client | Sends and receives 32-bit NEC IR frames |
 | `U8g2` | client | OLED rendering (`U8G2_SSD1306_128X64_NONAME_F_HW_I2C`) |
+| `FastLED` | client | WS2812B strip control (only required when `USE_WS2812=1`, default v4.2) |
+| `MFRC522` | client | NFC reader (only required when `HAS_NFC=1`) |
 
 Built into the ESP32 core (no install needed): `WiFi`, `esp_now`, `esp_wifi`,
 `HTTPClient`, `WiFiClientSecure`, `Preferences`, `ESPmDNS`, `DNSServer`,
