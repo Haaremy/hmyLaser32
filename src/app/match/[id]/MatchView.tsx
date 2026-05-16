@@ -55,33 +55,51 @@ export function MatchView({ matchId }: { matchId: string }) {
   const [err, setErr] = useState<string | null>(null);
   const [newFeedIds, setNewFeedIds] = useState<Set<string>>(new Set());
   const seenIdsRef = useRef<Set<string>>(new Set());
+  const wsRef = useRef<WebSocket | null>(null);
 
-  const fetchLive = useCallback(async () => {
-    try {
-      const r = await fetch(`/api/match/${matchId}/live`, { cache: 'no-store' });
-      if (!r.ok) throw new Error(`http ${r.status}`);
-      const data: LiveState = await r.json();
-      const fresh = new Set<string>();
-      for (const f of data.feed) {
-        if (!seenIdsRef.current.has(f.id)) fresh.add(f.id);
-        seenIdsRef.current.add(f.id);
-      }
-      if (fresh.size > 0) {
-        setNewFeedIds(fresh);
-        setTimeout(() => setNewFeedIds(new Set()), 1200);
-      }
-      setState(data);
-      setErr(null);
-    } catch (e: any) {
-      setErr(e?.message || 'load_error');
+  const applySnapshot = useCallback((data: LiveState) => {
+    const fresh = new Set<string>();
+    for (const f of data.feed) {
+      if (!seenIdsRef.current.has(f.id)) fresh.add(f.id);
+      seenIdsRef.current.add(f.id);
     }
-  }, [matchId]);
+    if (fresh.size > 0) {
+      setNewFeedIds(fresh);
+      setTimeout(() => setNewFeedIds(new Set()), 1200);
+    }
+    setState(data);
+    setErr(null);
+  }, []);
 
   useEffect(() => {
-    fetchLive();
-    const i = setInterval(fetchLive, 2500);
-    return () => clearInterval(i);
-  }, [fetchLive]);
+    let stopped = false;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function connect() {
+      if (stopped) return;
+      const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const url = `${proto}://${window.location.host}/api/ws/match/${matchId}`;
+      const ws = new WebSocket(url);
+      wsRef.current = ws;
+      ws.onmessage = (ev) => {
+        try {
+          const msg = JSON.parse(ev.data);
+          if (msg.type === 'snapshot') applySnapshot(msg as any);
+        } catch {}
+      };
+      ws.onerror = () => setErr('socket_error');
+      ws.onclose = () => {
+        wsRef.current = null;
+        if (!stopped) reconnectTimer = setTimeout(connect, 2000);
+      };
+    }
+    connect();
+    return () => {
+      stopped = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (wsRef.current) wsRef.current.close();
+    };
+  }, [matchId, applySnapshot]);
 
   if (err && !state) return <div className="hmy-alert hmy-alert--error">{err}</div>;
   if (!state) return <p>{t('title')}…</p>;
@@ -251,12 +269,7 @@ function SettingsTab({ matchId }: { matchId: string }) {
       <div className="hmy-card" style={{ maxWidth: 480, margin: '0 auto' }}>
         <div className="hmy-card__body">
           <p>{t('settings_locked')}</p>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setUnlocked(true);
-            }}
-          >
+          <form onSubmit={(e) => { e.preventDefault(); setUnlocked(true); }}>
             <div className="hmy-field">
               <label className="hmy-field__label">{t('settings_pin_label')}</label>
               <input
@@ -271,9 +284,7 @@ function SettingsTab({ matchId }: { matchId: string }) {
               />
             </div>
             {err && <div className="hmy-alert hmy-alert--error">{err}</div>}
-            <button className="hmy-btn hmy-btn--primary" type="submit">
-              {t('settings_unlock')}
-            </button>
+            <button className="hmy-btn hmy-btn--primary" type="submit">{t('settings_unlock')}</button>
           </form>
         </div>
       </div>
@@ -325,9 +336,7 @@ function SettingsTab({ matchId }: { matchId: string }) {
         {msg && <div className="hmy-alert hmy-alert--success">{msg}</div>}
       </div>
       <div className="hmy-card__footer">
-        <button className="hmy-btn hmy-btn--primary" type="submit">
-          {t('settings_save')}
-        </button>
+        <button className="hmy-btn hmy-btn--primary" type="submit">{t('settings_save')}</button>
       </div>
     </form>
   );

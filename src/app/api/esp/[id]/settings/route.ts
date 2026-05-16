@@ -57,5 +57,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     },
     select: { id: true, mode: true, lobbySeconds: true, matchSeconds: true, teams: true }
   });
+
+  // WS-Broadcast an Browser-Subscribers
+  (globalThis as any).wsHub?.broadcastEsp?.(server.id, { type: 'invalidate' });
+
   return NextResponse.json({ ok: true, ...updated, teams: parseTeams(updated.teams) });
 }

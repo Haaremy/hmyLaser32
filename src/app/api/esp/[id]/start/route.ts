@@ -6,8 +6,6 @@ export const runtime = 'nodejs';
 
 const schema = z.object({ pin: z.string().min(4).max(32) });
 
-// POST — Match-Start am ESP anfordern (PIN-gated).
-// Setzt nur das Flag, der ESP pulled es im nächsten Tick.
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   let body: z.infer<typeof schema>;
   try {
@@ -24,5 +22,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     where: { id: server.id },
     data: { startRequested: true }
   });
+  (globalThis as any).wsHub?.broadcastEsp?.(server.id, { type: 'invalidate' });
   return NextResponse.json({ ok: true });
 }

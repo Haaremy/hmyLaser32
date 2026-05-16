@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { RelativeTime } from '@/components/RelativeTime';
 import type { TeamDef } from '@/lib/teams';
@@ -31,17 +31,60 @@ export function EspDetail(p: Props) {
   const tc = useTranslations('common');
   const [tab, setTab] = useState<'overview' | 'settings'>('overview');
 
+  // WebSocket: live snapshot + write-channel
+  const [snapshot, setSnapshot] = useState<Props>(p);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    function connect() {
+      if (stopped) return;
+      const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const ws = new WebSocket(`${proto}://${window.location.host}/api/ws/esp/${p.id}`);
+      wsRef.current = ws;
+      ws.onmessage = (ev) => {
+        try {
+          const msg = JSON.parse(ev.data);
+          if (msg.type === 'snapshot') {
+            setSnapshot((prev) => ({
+              ...prev,
+              online: msg.online,
+              lastSeen: msg.lastSeen,
+              mode: msg.mode,
+              lobbySeconds: msg.lobbySeconds,
+              matchSeconds: msg.matchSeconds,
+              teams: msg.teams || [],
+              knownPlayers: msg.knownPlayers || [],
+              startRequested: msg.startRequested
+            }));
+          }
+        } catch {}
+      };
+      ws.onclose = () => {
+        wsRef.current = null;
+        if (!stopped) timer = setTimeout(connect, 2000);
+      };
+    }
+    connect();
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+      if (wsRef.current) wsRef.current.close();
+    };
+  }, [p.id]);
+
   return (
     <>
       <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontFamily: 'var(--hmy-font-family-mono)' }}>
-        {p.name}
+        {snapshot.name}
       </h1>
       <p>
-        <span className={`hmy-lt-pill ${p.online ? 'hmy-lt-pill--success' : 'hmy-lt-pill--muted'}`}>
-          {p.online ? tc('online') : tc('offline')}
+        <span className={`hmy-lt-pill ${snapshot.online ? 'hmy-lt-pill--success' : 'hmy-lt-pill--muted'}`}>
+          {snapshot.online ? tc('online') : tc('offline')}
         </span>{' '}
         <span style={{ color: 'var(--hmy-color-text-muted)', fontSize: 'var(--hmy-font-size-sm)' }}>
-          · <RelativeTime ts={p.lastSeen} />
+          · <RelativeTime ts={snapshot.lastSeen} />
         </span>
       </p>
 
@@ -64,7 +107,7 @@ export function EspDetail(p: Props) {
         </button>
       </div>
 
-      {tab === 'overview' ? <Overview p={p} tm={tm} /> : <Settings p={p} />}
+      {tab === 'overview' ? <Overview p={snapshot} tm={tm} /> : <Settings p={snapshot} ws={wsRef} />}
     </>
   );
 }
@@ -132,7 +175,7 @@ function Overview({ p, tm }: { p: Props; tm: ReturnType<typeof useTranslations> 
   );
 }
 
-function Settings({ p }: { p: Props }) {
+function Settings({ p, ws }: { p: Props; ws: React.MutableRefObject<WebSocket | null> }) {
   const [mode, setMode] = useState<Mode>((p.mode === 'team' ? 'team' : 'free-for-all'));
   const [starttimer, setStarttimer] = useState(p.lobbySeconds);
   const [duration, setDuration] = useState(p.matchSeconds);
@@ -146,23 +189,16 @@ function Settings({ p }: { p: Props }) {
         ]
   );
 
-  // Live-Refresh der bekannten Clients: alle 5 s neu pollen
-  const [knownPlayers, setKnownPlayers] = useState<KnownPlayer[]>(p.knownPlayers);
-  useEffect(() => {
-    const t = setInterval(async () => {
-      try {
-        const r = await fetch(`/api/esp/${p.id}/players`, { cache: 'no-store' });
-        if (r.ok) {
-          const d = await r.json();
-          setKnownPlayers(d.players || []);
-        }
-      } catch {}
-    }, 5000);
-    return () => clearInterval(t);
-  }, [p.id]);
+  const knownPlayers = p.knownPlayers; // live via WS
 
-  // Plus alle Mitglieder, die in den Teams angegeben sind, aber (noch) nicht
-  // als knownPlayer gemeldet wurden — damit eine Vorab-Konfig nicht verloren geht.
+  // Re-init local form when server-side snapshot changes (only if user not actively editing)
+  useEffect(() => {
+    setMode((p.mode === 'team' ? 'team' : 'free-for-all'));
+    setStarttimer(p.lobbySeconds);
+    setDuration(p.matchSeconds);
+    if (p.teams.length > 0) setTeams(p.teams);
+  }, [p.mode, p.lobbySeconds, p.matchSeconds, p.teams]);
+
   const allCommands = useMemo(() => {
     const set = new Set<number>();
     knownPlayers.forEach((kp) => set.add(kp.command));
@@ -186,7 +222,6 @@ function Settings({ p }: { p: Props }) {
   function unassignCommand(cmd: number) {
     setTeams(teams.map((t) => ({ ...t, members: t.members.filter((m) => m !== cmd) })));
   }
-
   function addTeam() {
     if (teams.length >= 4) return;
     setTeams([...teams, { name: `Team ${teams.length + 1}`, color: DEFAULT_COLORS[teams.length] || '#64748b', members: [] }]);
@@ -204,16 +239,38 @@ function Settings({ p }: { p: Props }) {
   const [err, setErr] = useState<string | null>(null);
   const [startPending, setStartPending] = useState(p.startRequested);
 
+  useEffect(() => setStartPending(p.startRequested), [p.startRequested]);
+
+  function sendOverWs(payload: any): boolean {
+    const sock = ws.current;
+    if (!sock || sock.readyState !== 1) return false;
+    sock.send(JSON.stringify(payload));
+    return true;
+  }
+
   async function saveSettings(e: React.FormEvent) {
     e.preventDefault();
     setMsg(null);
     setErr(null);
-    const body: any = { pin, mode, lobbySeconds: starttimer, matchSeconds: duration };
-    body.teams = mode === 'team' ? teams : [];
+
+    const payload = {
+      pin,
+      mode,
+      lobbySeconds: starttimer,
+      matchSeconds: duration,
+      teams: mode === 'team' ? teams : []
+    };
+
+    // Try WebSocket first; fallback to POST if not connected
+    if (sendOverWs({ action: 'updateSettings', ...payload })) {
+      // ACK comes back via WS handler; show optimistic message
+      setMsg('Gespeichert (via WebSocket). ESP übernimmt beim nächsten Pull (~30 s).');
+      return;
+    }
     const r = await fetch(`/api/esp/${p.id}/settings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      body: JSON.stringify(payload)
     });
     if (!r.ok) {
       const j = await r.json().catch(() => null);
@@ -227,6 +284,11 @@ function Settings({ p }: { p: Props }) {
     setMsg(null);
     setErr(null);
     if (pin.length < 4) { setErr('Bitte PIN eingeben.'); return; }
+    if (sendOverWs({ action: 'startMatch', pin })) {
+      setStartPending(true);
+      setMsg('Timer angefordert. ESP startet bei nächstem Pull (~30 s).');
+      return;
+    }
     const r = await fetch(`/api/esp/${p.id}/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -247,7 +309,7 @@ function Settings({ p }: { p: Props }) {
         <div className="hmy-card__header">Match-Defaults</div>
         <div className="hmy-card__body">
           <p style={{ marginTop: 0, color: 'var(--hmy-color-text-muted)', fontSize: 'var(--hmy-font-size-sm)' }}>
-            Diese Werte werden vom ESP regelmäßig gepulled und für jedes neue Match verwendet.
+            Live über WebSocket. Änderungen werden sofort gespeichert und der ESP holt sie beim nächsten Pull (~30 s).
           </p>
           <form onSubmit={saveSettings}>
             <div className="hmy-field">
@@ -309,7 +371,7 @@ function Settings({ p }: { p: Props }) {
                 <h4 style={{ marginTop: '1.5rem', marginBottom: '0.5rem' }}>Spielerzuordnung</h4>
                 <p style={{ fontSize: 'var(--hmy-font-size-xs)', color: 'var(--hmy-color-text-muted)', margin: '0 0 var(--hmy-spacing-3)' }}>
                   {knownPlayers.length === 0 && teams.every((t) => t.members.length === 0)
-                    ? 'Noch keine Clients verbunden. Sobald ein Player-ESP über ESP-NOW Daten sendet, erscheint er hier.'
+                    ? 'Noch keine Clients verbunden. Sobald ein Player-ESP über ESP-NOW Daten sendet, erscheint er hier (Live via WebSocket).'
                     : `${knownPlayers.length} Client(s) gemeldet. Wähle pro Spieler ein Team.`}
                 </p>
 

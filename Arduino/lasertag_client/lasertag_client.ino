@@ -1,8 +1,14 @@
 // ============================================================================
-//   hmyLaser32 — Client (Spieler-ESP, v3)
+//   hmyLaser32 — Client (v4)
 //   v1: stand-alone IR/ESP-NOW Gossip
 //   v2: + Match-Phase-Awareness via MSG_PHASE
 //   v3: + Team-Mode via MSG_TEAMS (RGB-LED + OLED zeigen Team)
+//   v4: + Auto-Identity (MAC-Aushandlung, 30 Namen + 10 Farben)
+//       + Wait-Mode bis ≥2 Peers oder Server
+//       + Stand-Alone-Lobby + Konsens-Match-Timer
+//       + Hit-Effekt: 3× Blink in Schützen-Farbe
+//       + Friendly Fire (kein Team-Kill-Schutz)
+//       + NFC-Logik (optional via HAS_NFC)
 // ============================================================================
 
 #include <WiFi.h>
@@ -16,8 +22,10 @@
 #include "Display.h"
 #include "Game.h"
 #include "Globals.h"
+#include "Identity.h"
 #include "LasertagNetwork.h"
 #include "Led.h"
+#include "Nfc.h"
 #include "Ranking.h"
 
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
@@ -45,7 +53,7 @@ unsigned long lastTableBroadcast = 0;
 volatile bool sendStatusPending = false;
 volatile esp_now_send_status_t lastSendStatus = ESP_NOW_SEND_FAIL;
 
-// Phase (v2)
+// Phase (v2/v3)
 uint8_t  g_phase = PHASE_IDLE;
 uint32_t g_phaseSecondsLeft = 0;
 unsigned long g_phaseLastUpdate = 0;
@@ -56,6 +64,16 @@ TeamDef g_teams[MAX_TEAMS] = {};
 uint8_t g_teamCount = 0;
 int8_t  g_myTeamIndex = -1;
 unsigned long g_teamsLastUpdate = 0;
+
+// Hit-Blink (v4)
+uint32_t g_hitBlinkColor = 0x000000;
+unsigned long g_hitBlinkUntilMs = 0;
+int g_hitBlinkRemaining = 0;
+
+// Standalone-Lobby (v4)
+uint8_t  g_standalonePhase = PHASE_IDLE;
+unsigned long g_standaloneLobbyEnds = 0;
+unsigned long g_standaloneMatchEnds = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -80,8 +98,10 @@ void setup() {
   WiFi.disconnect();
   esp_wifi_set_channel(WIFI_CHANNEL, WIFI_SECOND_CHAN_NONE);
 
-  if (esp_now_init() != ESP_OK) { Serial.println("[ESP-NOW] Init failed"); return; }
+  identityInit();
+  nfcBegin();
 
+  if (esp_now_init() != ESP_OK) { Serial.println("[ESP-NOW] Init failed"); return; }
   esp_now_register_send_cb(onDataSent);
   esp_now_register_recv_cb(onDataRecv);
 
@@ -92,10 +112,7 @@ void setup() {
   broadcastPeer.encrypt = false;
   esp_now_add_peer(&broadcastPeer);
 
-  updateMyScore(myPoints);
-  syncMyPointsFromRanking();
-
-  Serial.println("Lasertag ESP-NOW ready (v3 team aware)");
+  Serial.println("Lasertag client v4 ready");
   Serial.print("[ESP-NOW] My MAC: ");
   Serial.println(WiFi.macAddress());
   updateDisplay();
@@ -107,6 +124,11 @@ void loop() {
   static unsigned long lastPeriodicBroadcast = 0;
   static bool wasPlayerDisabled = false;
   static unsigned long lastLobbyTick = 0;
+  static unsigned long lastStandaloneTick = 0;
+
+  identityLoop();
+  nfcLoop();
+  ledTickHitBlink();
 
   const bool disabledNow = isPlayerDisabled();
   if (!handleTrigger()) return;
@@ -129,5 +151,12 @@ void loop() {
   if (g_phase == PHASE_LOBBY && millis() - lastLobbyTick > 1000) {
     lastLobbyTick = millis();
     updateDisplay();
+  }
+  if (millis() - lastStandaloneTick > 1000) {
+    lastStandaloneTick = millis();
+    standaloneStateTick(peerCount + 1);
+    if (g_standalonePhase == PHASE_LOBBY || g_standalonePhase == PHASE_ACTIVE) {
+      updateDisplay();
+    }
   }
 }

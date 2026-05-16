@@ -6,9 +6,11 @@
 void setRgbColor(uint8_t red, uint8_t green, uint8_t blue);
 void setLedNormalState();
 void setLedHitState();
-
-// v3: setzt die LED auf die Farbe des aktuellen Teams (falls zugeordnet),
-// sonst auf weiß. Nach Phase-Wechseln aufrufen.
 void applyTeamColor();
+
+// v4: Hit-Effekt — 3× Blink in der Farbe des Schützen.
+// Wird in loop() durch ledTickHitBlink() weitergetrieben.
+void triggerHitBlink(uint32_t shooterColor);
+void ledTickHitBlink();
 
 #endif

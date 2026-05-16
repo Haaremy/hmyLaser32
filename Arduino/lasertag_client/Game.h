@@ -6,9 +6,13 @@
 uint32_t getMyPlayerId();
 bool isPlayerDisabled();
 unsigned long getDisableTimeLeftMs();
-bool isShootingAllowed();   // NEU v2: nur in ACTIVE-Phase true (Stand-Alone: immer true)
+bool isShootingAllowed();
 bool handleTrigger();
 bool handleIrReceiver();
 void updateRespawnDisplayState(bool disabledNow, bool &wasPlayerDisabled);
+
+// v4: Standalone-Lobby/Match Konsens-Timer. peerCountIncludingSelf = unique
+// MAC-Adressen die der Client zur Zeit kennt (eigene zählt mit).
+void standaloneStateTick(int peerCountIncludingSelf);
 
 #endif

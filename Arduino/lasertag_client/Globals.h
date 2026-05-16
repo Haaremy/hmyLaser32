@@ -34,7 +34,7 @@ extern unsigned long lastTableBroadcast;
 extern volatile bool sendStatusPending;
 extern volatile esp_now_send_status_t lastSendStatus;
 
-// --- Match-Phase (v2) ------------------------------------------------------
+// --- Match-Phase (v2) -----------------------------------------------------
 extern uint8_t  g_phase;
 extern uint32_t g_phaseSecondsLeft;
 extern unsigned long g_phaseLastUpdate;
@@ -43,7 +43,20 @@ extern char     g_phaseMode[16];
 // --- Teams (v3) -----------------------------------------------------------
 extern TeamDef  g_teams[MAX_TEAMS];
 extern uint8_t  g_teamCount;
-extern int8_t   g_myTeamIndex;          // -1 wenn keinem Team zugeordnet
+extern int8_t   g_myTeamIndex;
 extern unsigned long g_teamsLastUpdate;
+
+// --- Hit-Effekt (v4) -----------------------------------------------------
+// Während der hit-blink-Sequenz wird die LED 3× in der Schützenfarbe geblinkt,
+// bevor sie für die Respawn-Zeit dunkel bleibt.
+extern uint32_t g_hitBlinkColor;
+extern unsigned long g_hitBlinkUntilMs;
+extern int g_hitBlinkRemaining;        // verbleibende Blink-Toggles
+
+// --- Stand-Alone-Lobby (v4) ----------------------------------------------
+// Ohne Server berechnen alle Clients ihre Lobby/Match-Zeiten selbst.
+extern uint8_t  g_standalonePhase;       // PHASE_IDLE/LOBBY/ACTIVE/DONE
+extern unsigned long g_standaloneLobbyEnds;
+extern unsigned long g_standaloneMatchEnds;
 
 #endif

@@ -6,8 +6,6 @@ import { knownPlayersSchema } from '@/lib/players';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// POST — ESP-Server meldet seine ESP-NOW-Snapshots (alle bekannten Player).
-// Bearer = PIN.
 export async function POST(req: Request) {
   const auth = req.headers.get('authorization');
   if (!auth || !auth.startsWith('Bearer ')) {
@@ -34,5 +32,6 @@ export async function POST(req: Request) {
       online: true
     }
   });
+  (globalThis as any).wsHub?.broadcastEsp?.(server.id, { type: 'invalidate' });
   return NextResponse.json({ ok: true, count: parsed.data.length });
 }
