@@ -1,14 +1,14 @@
 // ============================================================================
-//   hmyLaser32 — Client (v4)
+//   hmyLaser32 — Client (v4.1)
 //   v1: stand-alone IR/ESP-NOW Gossip
 //   v2: + Match-Phase-Awareness via MSG_PHASE
-//   v3: + Team-Mode via MSG_TEAMS (RGB-LED + OLED zeigen Team)
+//   v3: + Team-Mode via MSG_TEAMS
 //   v4: + Auto-Identity (MAC-Aushandlung, 30 Namen + 10 Farben)
-//       + Wait-Mode bis ≥2 Peers oder Server
-//       + Stand-Alone-Lobby + Konsens-Match-Timer
-//       + Hit-Effekt: 3× Blink in Schützen-Farbe
-//       + Friendly Fire (kein Team-Kill-Schutz)
-//       + NFC-Logik (optional via HAS_NFC)
+//       + Wait-Mode, Hit-Effekt, Stand-Alone-Lobby
+//       + Friendly Fire, NFC-Logik (optional HAS_NFC)
+//   v4.1: + Master-Election + MSG_STANDALONE-Konsens
+//         + Button auf GPIO 19 (default, NFC nur als Empfehlung)
+//         + Schnellere Discovery in den ersten 15s (1 s statt 5 s)
 // ============================================================================
 
 #include <WiFi.h>
@@ -70,10 +70,11 @@ uint32_t g_hitBlinkColor = 0x000000;
 unsigned long g_hitBlinkUntilMs = 0;
 int g_hitBlinkRemaining = 0;
 
-// Standalone-Lobby (v4)
+// Standalone-Lobby (v4 + v4.1 Master-Election)
 uint8_t  g_standalonePhase = PHASE_IDLE;
 unsigned long g_standaloneLobbyEnds = 0;
 unsigned long g_standaloneMatchEnds = 0;
+unsigned long g_standaloneLastUpdate = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -112,7 +113,7 @@ void setup() {
   broadcastPeer.encrypt = false;
   esp_now_add_peer(&broadcastPeer);
 
-  Serial.println("Lasertag client v4 ready");
+  Serial.println("Lasertag client v4.1 ready");
   Serial.print("[ESP-NOW] My MAC: ");
   Serial.println(WiFi.macAddress());
   updateDisplay();
@@ -125,6 +126,8 @@ void loop() {
   static bool wasPlayerDisabled = false;
   static unsigned long lastLobbyTick = 0;
   static unsigned long lastStandaloneTick = 0;
+  static unsigned long lastStandaloneBroadcast = 0;
+  static const unsigned long bootAtMs = millis();
 
   identityLoop();
   nfcLoop();
@@ -137,10 +140,16 @@ void loop() {
   updateRespawnDisplayState(disabledNow, wasPlayerDisabled);
   handleSendStatusLog();
 
-  if (millis() - lastDiscovery > 5000) {
+  // v4.1: schnellere Discovery in den ersten 15s, danach langsamer
+  unsigned long discoveryInterval =
+    (millis() - bootAtMs < DISCOVERY_FAST_PHASE_MS)
+      ? DISCOVERY_FAST_INTERVAL_MS
+      : DISCOVERY_SLOW_INTERVAL_MS;
+  if (millis() - lastDiscovery > discoveryInterval) {
     sendDiscovery();
     lastDiscovery = millis();
   }
+
   if (pendingTableBroadcast && millis() - lastTableBroadcast > 300) {
     broadcastRankingTable();
   }
@@ -158,5 +167,11 @@ void loop() {
     if (g_standalonePhase == PHASE_LOBBY || g_standalonePhase == PHASE_ACTIVE) {
       updateDisplay();
     }
+  }
+
+  // v4.1 — Master broadcastet jede Sekunde den Standalone-State
+  if (millis() - lastStandaloneBroadcast > STANDALONE_BROADCAST_MS) {
+    lastStandaloneBroadcast = millis();
+    broadcastStandaloneState();
   }
 }

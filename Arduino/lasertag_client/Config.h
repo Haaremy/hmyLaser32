@@ -4,9 +4,10 @@
 #include <Arduino.h>
 
 // ============================================================================
-//   hmyLaser32 — Client-Konfiguration (v4: auto-identity, hit-effect, NFC)
-//   Pro Gerät müssen keine Spielerdaten mehr hardcoded werden — Name und
-//   Farbe werden zur Lobby-Zeit ausgehandelt (s. Identity.cpp).
+//   hmyLaser32 — Client-Konfiguration (v4.1)
+//   - Auto-Identity via MAC-Aushandlung (keine MY_NAME-Hardcoding mehr)
+//   - Master-Election für Standalone-Lobby (niedrigste MAC → Master,
+//     broadcastet MSG_STANDALONE, andere syncen ihre Timer)
 // ============================================================================
 
 constexpr uint8_t WIFI_CHANNEL = 1;
@@ -15,36 +16,34 @@ constexpr int MAX_PLAYERS = 10;
 constexpr int MAX_TEAMS = 4;
 
 // --- Pin-Belegung (NodeMCU-32S) -------------------------------------------
-// HINWEIS v4: Button auf GPIO 32 verlegt, damit MFRC522-NFC-Reader (optional)
-// die SPI-Pins 18/19/23 freilässt. Aktualisiere die HW entsprechend, oder
-// behalte GPIO 19 ohne NFC-Erweiterung.
+// Default-Pinout — identisch zu v1 (Paper).
+// Wer NFC nachrüsten will: MFRC522 nutzt MISO=GPIO 19. Dann den Button
+// auf GPIO 32 (oder 33) verlegen und unten BUTTON_PIN entsprechend setzen.
 constexpr uint16_t IR_SEND_PIN = 4;
 constexpr uint16_t IR_RECV_PIN = 14;
-constexpr uint16_t BUTTON_PIN  = 32;       // war 19 (vor v4)
+constexpr uint16_t BUTTON_PIN  = 19;
 constexpr uint16_t RGB_RED_PIN = 25;
 constexpr uint16_t RGB_GREEN_PIN = 26;
 constexpr uint16_t RGB_BLUE_PIN = 27;
 constexpr bool     RGB_COMMON_ANODE = false;
 
-// --- NFC (optional) -------------------------------------------------------
-// Wenn ein MFRC522 angeschlossen ist: HAS_NFC auf 1 setzen. Sonst bleibt der
-// Code skip-fähig (NFC-Funktionen sind no-ops).
+// --- NFC (optional, Hardware nicht im V1-Bauplan) -------------------------
 #define HAS_NFC 0
 constexpr uint16_t NFC_SS_PIN  = 5;
 constexpr uint16_t NFC_RST_PIN = 33;
-// SPI MOSI=23, MISO=19, SCK=18 (Hardware-SPI VSPI)
+// Wer NFC nutzen will: HAS_NFC=1, BUTTON_PIN auf 32 verlegen
+// SPI-Pins: MOSI=23, MISO=19, SCK=18 (Hardware-SPI VSPI)
 
 // --- IR-Identifikation ----------------------------------------------------
-// IR_GAME_ADDRESS ist konstant; das Command-Byte ergibt sich aus der
-// ausgehandelten Identität (Identity.cpp::identityMyCommand()).
 constexpr uint16_t IR_GAME_ADDRESS = 0x00FF;
 
 // --- ESP-NOW Message-Typen ------------------------------------------------
-constexpr uint8_t MSG_DISCOVERY = 0;
-constexpr uint8_t MSG_TABLE     = 1;
-constexpr uint8_t MSG_PHASE     = 2;
-constexpr uint8_t MSG_TEAMS     = 3;
-constexpr uint8_t MSG_NFC       = 4;       // v4: NFC-Account-Bind-Push
+constexpr uint8_t MSG_DISCOVERY  = 0;
+constexpr uint8_t MSG_TABLE      = 1;
+constexpr uint8_t MSG_PHASE      = 2;
+constexpr uint8_t MSG_TEAMS      = 3;
+constexpr uint8_t MSG_NFC        = 4;
+constexpr uint8_t MSG_STANDALONE = 5;   // v4.1 — Lobby-Master Konsens
 
 // --- Match-Phasen ---------------------------------------------------------
 constexpr uint8_t PHASE_IDLE   = 0;
@@ -58,12 +57,20 @@ constexpr unsigned long SELF_HIT_IGNORE_MS = 200;
 constexpr unsigned long HIT_DISABLE_MS = 5000;
 constexpr unsigned long PHASE_TIMEOUT_MS = 5000;
 constexpr unsigned long TEAMS_TIMEOUT_MS = 8000;
-constexpr unsigned long HIT_BLINK_INTERVAL_MS = 120;   // 3x blink → ~720 ms total
+constexpr unsigned long HIT_BLINK_INTERVAL_MS = 120;
+
+// Identity-Aushandlung: warte 5s nach letztem neuen Peer (mehr Toleranz
+// für späte Discoveries), aber sende Discovery alle 1s in den ersten 15s
+// (für schnelles gegenseitiges Finden), danach alle 5s.
+constexpr unsigned long IDENTITY_WAIT_MS         = 5000;
+constexpr unsigned long DISCOVERY_FAST_INTERVAL_MS = 1000;
+constexpr unsigned long DISCOVERY_SLOW_INTERVAL_MS = 5000;
+constexpr unsigned long DISCOVERY_FAST_PHASE_MS    = 15000;
 
 // --- Stand-Alone-Lobby ----------------------------------------------------
-// Ohne Server starten die Clients ihre eigene Lobby, sobald ≥2 Peers
-// gefunden wurden. Match-Dauer ist hardcoded; Web-Settings nur via Server.
 constexpr unsigned long STANDALONE_LOBBY_SECONDS = 60;
 constexpr unsigned long STANDALONE_MATCH_SECONDS = 300;
+constexpr unsigned long STANDALONE_TIMEOUT_MS    = 4000;   // master ohne MSG_STANDALONE
+constexpr unsigned long STANDALONE_BROADCAST_MS  = 1000;   // master sendet 1×/s
 
 #endif

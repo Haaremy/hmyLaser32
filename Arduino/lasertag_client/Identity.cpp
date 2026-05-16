@@ -36,19 +36,17 @@ struct KnownPeer {
 };
 
 static KnownPeer kPeers[MAX_PEERS];
-static int kPeerCount = 0;
-static uint8_t kMyMac[6] = {0};
-static bool kAssigned = false;
-static uint8_t kMyIndex = 0;            // Index in NAME_POOL / COLOR_POOL
-static char kMyName[16] = "Searching...";
-static uint32_t kMyColor = 0xffffff;
+static int       kPeerCount = 0;
+static uint8_t   kMyMac[6] = {0};
+static bool      kAssigned = false;
+static uint8_t   kMyIndex = 0;
+static char      kMyName[16] = "Searching...";
+static uint32_t  kMyColor = 0xffffff;
 static unsigned long kLastPeerEvent = 0;
 static unsigned long kLastRecheck = 0;
-static bool kHasServer = false;
+static bool      kHasServer = false;
 
-static int macCmp(const uint8_t *a, const uint8_t *b) {
-  return memcmp(a, b, 6);
-}
+static int macCmp(const uint8_t *a, const uint8_t *b) { return memcmp(a, b, 6); }
 
 static int findPeer(const uint8_t *mac) {
   for (int i = 0; i < kPeerCount; i++) {
@@ -69,13 +67,22 @@ static void sortPeersByMac() {
   }
 }
 
+static void logPeers(const char *tag) {
+  Serial.printf("[IDENTITY:%s] kPeerCount=%d, kAssigned=%d, myIndex=%u\n",
+                tag, kPeerCount, kAssigned, kMyIndex);
+  for (int i = 0; i < kPeerCount; i++) {
+    Serial.printf("  [%d] %02X:%02X:%02X:%02X:%02X:%02X%s\n", i,
+                  kPeers[i].mac[0], kPeers[i].mac[1], kPeers[i].mac[2],
+                  kPeers[i].mac[3], kPeers[i].mac[4], kPeers[i].mac[5],
+                  (memcmp(kPeers[i].mac, kMyMac, 6) == 0) ? "  <- me" : "");
+  }
+}
+
 void identityInit() {
   WiFi.macAddress(kMyMac);
   Serial.printf("[IDENTITY] My MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
                 kMyMac[0], kMyMac[1], kMyMac[2], kMyMac[3], kMyMac[4], kMyMac[5]);
 
-  // Eigene MAC als ersten "Peer" eintragen — wir nehmen am Aushandlungs-
-  // ranking teil
   memcpy(kPeers[0].mac, kMyMac, 6);
   kPeers[0].isServer = false;
   kPeers[0].lastSeen = millis();
@@ -96,8 +103,9 @@ void identityPeerSeen(const uint8_t *mac, bool isServer) {
     kPeers[kPeerCount].isServer = isServer;
     kPeers[kPeerCount].lastSeen = now;
     kPeerCount++;
-    kLastPeerEvent = now;     // reset timer
-    Serial.printf("[IDENTITY] New peer (count=%d), reset wait-timer\n", kPeerCount);
+    kLastPeerEvent = now;
+    Serial.printf("[IDENTITY] +peer #%d %02X:%02X:%02X:%02X:%02X:%02X (server=%d)\n",
+                  kPeerCount, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], isServer);
   } else {
     kPeers[idx].lastSeen = now;
     if (isServer) kPeers[idx].isServer = true;
@@ -106,9 +114,6 @@ void identityPeerSeen(const uint8_t *mac, bool isServer) {
 }
 
 static void assignIdentity() {
-  // Server-Mode: wir warten auf MSG_TEAMS/MSG_PHASE und übernehmen die
-  // Server-Zuweisung. Aktuell vergeben wir trotzdem eine vorläufige
-  // Identität, die der Server dann via MSG_TEAMS überschreiben kann.
   sortPeersByMac();
   int idx = -1;
   for (int i = 0; i < kPeerCount; i++) {
@@ -119,43 +124,47 @@ static void assignIdentity() {
   strlcpy(kMyName, NAME_POOL[idx % NAME_POOL_SIZE], sizeof(kMyName));
   kMyColor = COLOR_POOL[idx % COLOR_POOL_SIZE];
   kAssigned = true;
-  Serial.printf("[IDENTITY] Assigned: idx=%d name=%s color=#%06lx (peers=%d)\n",
+  Serial.printf("[IDENTITY] *** ASSIGN *** idx=%d name=%s color=#%06lx (peers=%d)\n",
                 idx, kMyName, (unsigned long)kMyColor, kPeerCount);
-  applyTeamColor();   // LED auf Farbe setzen
+  logPeers("post-assign");
+  applyTeamColor();
   updateDisplay();
 }
 
 void identityLoop() {
   unsigned long now = millis();
-  // Wenn wir noch nicht assigned sind und seit IDENTITY_WAIT_MS Stille:
-  if (!kAssigned && now - kLastPeerEvent > IDENTITY_WAIT_MS) {
-    // Wenn nur wir selbst auf der Liste → Wait-Mode bleibt, kein Assign
-    // (Spec: "Wenn nur ein Spieler ohne Server in der Lobby ist, soll er
-    //  in einen warte/suche Modus gehen bis der nächste Spieler auftaucht")
-    if (kPeerCount > 1 || kHasServer) {
+
+  // Wait-Phase: assign sobald ≥2 Peers (uns selbst eingeschlossen) UND
+  // seit IDENTITY_WAIT_MS keine neuen Peers mehr.
+  if (!kAssigned && (now - kLastPeerEvent) > IDENTITY_WAIT_MS) {
+    if (kPeerCount >= 2 || kHasServer) {
       assignIdentity();
     }
   }
-  // Periodischer Recheck: wenn neue Peers später kommen, neu sortieren +
-  // ggf. eigenen Index updaten
-  if (kAssigned && now - kLastRecheck > IDENTITY_RECHECK_MS) {
+
+  // Recheck: wenn später neue Peers dazukommen, könnte sich unser Index
+  // verschieben. Aber Vorsicht — wir wollen nicht ständig den Namen
+  // ändern, sobald Identity assigned ist. Lass den Index stabil bleiben
+  // (Spec: "weitere Spieler erhalten aufsteigend Namen").
+  // Hier nur logger-output.
+  if (kAssigned && (now - kLastRecheck) > 10000UL) {
     kLastRecheck = now;
-    uint8_t prev = kMyIndex;
-    sortPeersByMac();
-    for (int i = 0; i < kPeerCount; i++) {
-      if (memcmp(kPeers[i].mac, kMyMac, 6) == 0) { kMyIndex = (uint8_t)i; break; }
-    }
-    if (kMyIndex != prev) {
-      strlcpy(kMyName, NAME_POOL[kMyIndex % NAME_POOL_SIZE], sizeof(kMyName));
-      kMyColor = COLOR_POOL[kMyIndex % COLOR_POOL_SIZE];
-      Serial.printf("[IDENTITY] Re-indexed to %u (%s)\n", kMyIndex, kMyName);
-      applyTeamColor();
-      updateDisplay();
-    }
+    logPeers("periodic");
   }
 }
 
-const char *identityMyName() { return kMyName; }
-uint32_t    identityMyColor() { return kMyColor; }
-uint8_t     identityMyCommand() { return (uint8_t)((kMyIndex % 254) + 1); }
-bool        identityIsAssigned() { return kAssigned; }
+const char *identityMyName()   { return kMyName; }
+uint32_t    identityMyColor()  { return kMyColor; }
+uint8_t     identityMyCommand(){ return (uint8_t)((kMyIndex % 254) + 1); }
+bool        identityIsAssigned(){ return kAssigned; }
+
+// === Master-Election (v4.1) ==============================================
+// Der Client mit der niedrigsten bekannten MAC ist Master und sendet
+// MSG_STANDALONE 1×/s.
+bool identityIsLobbyMaster() {
+  if (!kAssigned || kPeerCount < 2) return false;
+  // Nach assignment ist kPeers[0] (sortiert) der mit kleinster MAC.
+  return memcmp(kPeers[0].mac, kMyMac, 6) == 0;
+}
+
+uint8_t identityPeerCount() { return (uint8_t)kPeerCount; }

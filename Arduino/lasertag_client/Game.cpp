@@ -23,11 +23,9 @@ unsigned long getDisableTimeLeftMs() {
 }
 
 static uint8_t effectivePhase() {
-  // Server-aware phase (vom Server broadcastet)
   if (g_phaseLastUpdate != 0 && (millis() - g_phaseLastUpdate) < PHASE_TIMEOUT_MS) {
     return g_phase;
   }
-  // Server-Fallback: standalone-Phase (Konsens via Discovery)
   return g_standalonePhase;
 }
 
@@ -35,12 +33,8 @@ bool isShootingAllowed() {
   return effectivePhase() == PHASE_ACTIVE;
 }
 
-// Lookup der Schützen-Farbe aus den Teams (Team-Modus) oder Identitäts-
-// Farbe (FFA, abgeleitet von Player-Index = command - 1).
 static uint32_t resolveShooterColor(uint32_t shooterPlayerId) {
-  // command-Byte aus NEC playerId (bits 8..15)
   uint8_t cmd = (uint8_t)((shooterPlayerId >> 8) & 0xFF);
-  // 1) Team-Modus mit gültiger Teams-Liste
   bool teamsFresh = g_teamCount > 0 && (millis() - g_teamsLastUpdate) < TEAMS_TIMEOUT_MS;
   if (teamsFresh) {
     uint32_t bit = (cmd >= 1 && cmd <= 32) ? (1u << (cmd - 1)) : 0u;
@@ -48,10 +42,7 @@ static uint32_t resolveShooterColor(uint32_t shooterPlayerId) {
       if (g_teams[i].memberBits & bit) return g_teams[i].color;
     }
   }
-  // 2) FFA: COLOR_POOL[(cmd - 1) % POOL_SIZE]
-  if (cmd >= 1) {
-    return COLOR_POOL[(cmd - 1) % COLOR_POOL_SIZE];
-  }
+  if (cmd >= 1) return COLOR_POOL[(cmd - 1) % COLOR_POOL_SIZE];
   return 0xFFFFFF;
 }
 
@@ -69,13 +60,14 @@ bool handleTrigger() {
     if (reading == LOW) {
       if (isPlayerDisabled()) { updateDisplay(); return false; }
       if (!isShootingAllowed()) { updateDisplay(); return false; }
-      if (!identityIsAssigned()) { updateDisplay(); return false; }   // Wait-Mode
+      if (!identityIsAssigned()) { updateDisplay(); return false; }
 
       const uint32_t myPlayerId = getMyPlayerId();
       irsend.sendNEC(static_cast<uint64_t>(myPlayerId), 32);
       lastShotAt = millis();
       shotsFired++;
-      Serial.printf("[SHOT] %s sent NEC 0x%lx, shot #%d\n", identityMyName(), (unsigned long)myPlayerId, shotsFired);
+      Serial.printf("[SHOT] %s sent NEC 0x%lx, shot #%d\n",
+                    identityMyName(), (unsigned long)myPlayerId, shotsFired);
       updateDisplay();
     }
   }
@@ -100,24 +92,17 @@ bool handleIrReceiver() {
   }
 
   if (results.address != IR_GAME_ADDRESS) {
-    // Fremdes Protokoll
   } else if (isPlayerDisabled()) {
-    // Schon down
   } else if (!isShootingAllowed()) {
-    // Falsche Phase
   } else if (shooterId == getMyPlayerId() && withinSelfHitWindow) {
-    // Self-hit Schutzfenster
   } else if (shooterId != getMyPlayerId()) {
-    // === Treffer registriert ===
-    // v4: Friendly Fire ist erlaubt — keine Team-Check-Logik mehr.
     hitCount++;
     playerDisabledUntil = millis() + HIT_DISABLE_MS;
     uint32_t shooterColor = resolveShooterColor(shooterId);
     triggerHitBlink(shooterColor);
-    Serial.printf("[HIT] from %s (color #%06lx), respawn %lu s\n",
+    Serial.printf("[HIT] from %s (color #%06lx)\n",
                   shooterNameCopy[0] ? shooterNameCopy : "?",
-                  (unsigned long)shooterColor,
-                  HIT_DISABLE_MS / 1000UL);
+                  (unsigned long)shooterColor);
 
     if (shooterName != nullptr && awardPointsToPlayer(shooterId, shooterNameCopy, 10)) {
       queueTableBroadcast();
@@ -131,24 +116,22 @@ bool handleIrReceiver() {
 
 void updateRespawnDisplayState(bool disabledNow, bool &wasPlayerDisabled) {
   if (disabledNow) {
-    // LED wird durch ledTickHitBlink() weitergeführt
     if (millis() - lastDisplayRefreshAt >= 150) updateDisplay();
   } else if (wasPlayerDisabled) {
-    // Respawn fertig → zurück auf Team-/Identitäts-Farbe
     applyTeamColor();
     updateDisplay();
   }
   wasPlayerDisabled = disabledNow;
 }
 
-// v4: Stand-Alone-Lobby/Match-State-Machine.
-// Wird in loop() aufgerufen. Sobald der Client ≥2 Peers kennt (sich selbst +
-// 1 anderen) UND kein Server aktiv ist, startet die Lobby automatisch nach
-// einer kurzen Verzögerung. Ablauf:
-//   IDLE  → (peer count ≥ 2)            → LOBBY
-//   LOBBY → (STANDALONE_LOBBY_SECONDS)  → ACTIVE
-//   ACTIVE→ (STANDALONE_MATCH_SECONDS)  → DONE
-//   DONE  → (PHASE_TIMEOUT_MS gelagert) → IDLE
+// === Standalone-State-Machine (v4 + v4.1 Master-Election) ================
+// Master (= niedrigste MAC unter den bekannten Peers) treibt die State-
+// Machine voran. Andere Clients syncen ihre Timer per MSG_STANDALONE.
+//
+// Wenn länger als STANDALONE_TIMEOUT_MS keine Master-Nachricht eingegangen
+// ist, übernimmt der aktuelle Knoten (sofern er Master ist) selbst die
+// Initiative — oder bleibt im aktuellen Zustand bis der Master wieder da
+// ist (passive Knoten).
 static unsigned long kStandaloneStateChangedAt = 0;
 
 void standaloneStateTick(int peerCountIncludingSelf) {
@@ -157,38 +140,56 @@ void standaloneStateTick(int peerCountIncludingSelf) {
     g_standalonePhase = PHASE_IDLE;
     return;
   }
+  if (!identityIsAssigned()) return;
+
   unsigned long now = millis();
+  bool iAmMaster = identityIsLobbyMaster();
+  bool masterFresh = (g_standaloneLastUpdate != 0) &&
+                     (now - g_standaloneLastUpdate < STANDALONE_TIMEOUT_MS);
+
+  // Wenn ein Master existiert und nicht ich bin → passive: warten auf
+  // MSG_STANDALONE, lokale Timer werden durch handleStandalone() gesetzt.
+  // Wenn der lokal aktive Phasenstand abgelaufen ist, einfach Timer-Update
+  // dem Master überlassen.
+  if (!iAmMaster && masterFresh) {
+    // Lokal nichts ausrichten — Master treibt voran
+    return;
+  }
+
+  // Ich bin Master ODER kein frischer Master da → ich entscheide
   switch (g_standalonePhase) {
     case PHASE_IDLE:
-      if (peerCountIncludingSelf >= 2 && identityIsAssigned()) {
+      if (peerCountIncludingSelf >= 2 && iAmMaster) {
         g_standalonePhase = PHASE_LOBBY;
         g_standaloneLobbyEnds = now + STANDALONE_LOBBY_SECONDS * 1000UL;
         kStandaloneStateChangedAt = now;
-        Serial.printf("[STANDALONE] LOBBY (%lus)\n", (unsigned long)STANDALONE_LOBBY_SECONDS);
+        Serial.printf("[STANDALONE] Master starts LOBBY (%lus)\n",
+                      (unsigned long)STANDALONE_LOBBY_SECONDS);
         memset(ranking, 0, sizeof(ranking));
         hitCount = 0; shotsFired = 0; myPoints = 0;
         updateDisplay();
       }
       break;
     case PHASE_LOBBY:
-      if ((long)(now - g_standaloneLobbyEnds) >= 0) {
+      if ((long)(now - g_standaloneLobbyEnds) >= 0 && iAmMaster) {
         g_standalonePhase = PHASE_ACTIVE;
         g_standaloneMatchEnds = now + STANDALONE_MATCH_SECONDS * 1000UL;
         kStandaloneStateChangedAt = now;
-        Serial.printf("[STANDALONE] ACTIVE (%lus)\n", (unsigned long)STANDALONE_MATCH_SECONDS);
+        Serial.printf("[STANDALONE] Master moves to ACTIVE (%lus)\n",
+                      (unsigned long)STANDALONE_MATCH_SECONDS);
         updateDisplay();
       }
       break;
     case PHASE_ACTIVE:
-      if ((long)(now - g_standaloneMatchEnds) >= 0) {
+      if ((long)(now - g_standaloneMatchEnds) >= 0 && iAmMaster) {
         g_standalonePhase = PHASE_DONE;
         kStandaloneStateChangedAt = now;
-        Serial.println("[STANDALONE] DONE");
+        Serial.println("[STANDALONE] Master moves to DONE");
         updateDisplay();
       }
       break;
     case PHASE_DONE:
-      if (now - kStandaloneStateChangedAt > 15000UL) {
+      if (now - kStandaloneStateChangedAt > 15000UL && iAmMaster) {
         g_standalonePhase = PHASE_IDLE;
         kStandaloneStateChangedAt = now;
         updateDisplay();

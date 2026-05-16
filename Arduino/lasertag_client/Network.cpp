@@ -15,10 +15,6 @@ bool peerExists(const uint8_t *mac) {
   return false;
 }
 
-void printMac(const uint8_t *mac) {
-  for (int i = 0; i < 6; i++) { Serial.printf("%02X", mac[i]); if (i < 5) Serial.print(":"); }
-}
-
 void addPeer(const uint8_t *mac) {
   if (peerExists(mac) || peerCount >= MAX_PEERS) return;
   esp_now_peer_info_t peerInfo = {};
@@ -33,13 +29,11 @@ void addPeer(const uint8_t *mac) {
 
 #if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
 void onDataSent(const wifi_tx_info_t *info, esp_now_send_status_t status) {
-  (void)info;
-  lastSendStatus = status; sendStatusPending = true;
+  (void)info; lastSendStatus = status; sendStatusPending = true;
 }
 #else
 void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
-  (void)mac_addr;
-  lastSendStatus = status; sendStatusPending = true;
+  (void)mac_addr; lastSendStatus = status; sendStatusPending = true;
 }
 #endif
 
@@ -78,15 +72,46 @@ static void handleTeams(const Message &m) {
   updateDisplay();
 }
 
+// v4.1: MSG_STANDALONE vom Lobby-Master.
+// entries[0].playerId   = phase
+// entries[0].points     = secondsLeftInPhase
+// entries[0].player     = "standalone"
+// entries[0].lastUpdate = millis() (Sender-Clock)
+static void handleStandalone(const Message &m, const uint8_t *srcMac) {
+  if (m.playerCount < 1) return;
+  uint8_t newPhase = (uint8_t)m.entries[0].playerId;
+  if (newPhase > PHASE_DONE) return;
+  unsigned long secsLeft = (uint32_t)(m.entries[0].points < 0 ? 0 : m.entries[0].points);
+  unsigned long now = millis();
+
+  uint8_t prevPhase = g_standalonePhase;
+  g_standalonePhase = newPhase;
+  g_standaloneLastUpdate = now;
+
+  if (newPhase == PHASE_LOBBY) {
+    g_standaloneLobbyEnds = now + secsLeft * 1000UL;
+  } else if (newPhase == PHASE_ACTIVE) {
+    g_standaloneMatchEnds = now + secsLeft * 1000UL;
+  }
+
+  if (prevPhase != newPhase) {
+    Serial.printf("[STANDALONE] Synced from master: phase %u -> %u (%lu s left)\n",
+                  prevPhase, newPhase, secsLeft);
+    if (newPhase == PHASE_LOBBY) {
+      shotsFired = 0; hitCount = 0; myPoints = 0;
+      memset(ranking, 0, sizeof(ranking));
+    }
+    applyTeamColor();
+    updateDisplay();
+  }
+}
+
 void processIncomingMessage(const uint8_t *srcAddr, const uint8_t *data, int len) {
   if (len != sizeof(Message)) return;
   Message incoming;
   memcpy(&incoming, data, sizeof(incoming));
   addPeer(srcAddr);
 
-  // Identity-Tracking: jeder Discover-/Table-/Phase-Absender ist ein Peer.
-  // Server erkennen wir am MSG_PHASE-Anzeichen (Phase-Broadcasts kommen vom
-  // Server-ESP) — oder simpler: jede MSG_PHASE markiert den Sender als Server.
   bool isServer = (incoming.msgType == MSG_PHASE || incoming.msgType == MSG_TEAMS);
   identityPeerSeen(srcAddr, isServer);
 
@@ -100,9 +125,10 @@ void processIncomingMessage(const uint8_t *srcAddr, const uint8_t *data, int len
     case MSG_TEAMS:
       handleTeams(incoming);
       return;
+    case MSG_STANDALONE:
+      handleStandalone(incoming, srcAddr);
+      return;
     case MSG_NFC:
-      // Vom Server (Resolver) gemappte Identity zurückspielen? Optional.
-      // Im aktuellen Setup ist MSG_NFC nur Client → Server.
       return;
     case MSG_TABLE: {
       bool changed = false;
@@ -145,6 +171,7 @@ void sendDiscovery() {
 }
 
 void broadcastRankingTable() {
+  const uint8_t broadcast[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
   memset(&outgoing, 0, sizeof(outgoing));
   strncpy(outgoing.senderName, identityMyName(), sizeof(outgoing.senderName) - 1);
   outgoing.msgType = MSG_TABLE;
@@ -152,11 +179,37 @@ void broadcastRankingTable() {
     outgoing.entries[i] = ranking[i];
     if (ranking[i].player[0] != '\0') outgoing.playerCount++;
   }
-  for (int i = 0; i < peerCount; i++) {
-    esp_now_send(knownPeers[i], reinterpret_cast<const uint8_t *>(&outgoing), sizeof(outgoing));
-  }
+  // Broadcast statt unicast-an-jeden — spart Bandbreite
+  esp_now_send(broadcast, reinterpret_cast<const uint8_t *>(&outgoing), sizeof(outgoing));
   lastTableBroadcast = millis();
   pendingTableBroadcast = false;
+}
+
+// v4.1 — Master broadcastet aktuelle Standalone-Phase + Restzeit
+void broadcastStandaloneState() {
+  if (!identityIsLobbyMaster()) return;
+  if (g_standalonePhase != PHASE_LOBBY && g_standalonePhase != PHASE_ACTIVE) return;
+
+  const uint8_t broadcast[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+  Message m = {};
+  strlcpy(m.senderName, identityMyName(), sizeof(m.senderName));
+  m.msgType = MSG_STANDALONE;
+  m.playerCount = 1;
+  m.entries[0].playerId = (uint32_t)g_standalonePhase;
+
+  unsigned long now = millis();
+  long secsLeft = 0;
+  if (g_standalonePhase == PHASE_LOBBY) {
+    secsLeft = (long)(g_standaloneLobbyEnds - now) / 1000L;
+  } else if (g_standalonePhase == PHASE_ACTIVE) {
+    secsLeft = (long)(g_standaloneMatchEnds - now) / 1000L;
+  }
+  if (secsLeft < 0) secsLeft = 0;
+  m.entries[0].points = (int16_t)(secsLeft > 32767 ? 32767 : secsLeft);
+  strlcpy(m.entries[0].player, "standalone", sizeof(m.entries[0].player));
+  m.entries[0].lastUpdate = now;
+
+  esp_now_send(broadcast, reinterpret_cast<const uint8_t *>(&m), sizeof(m));
 }
 
 void handleSendStatusLog() {
