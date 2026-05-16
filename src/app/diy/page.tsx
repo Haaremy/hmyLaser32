@@ -109,7 +109,23 @@ const steps = [
         <p>
           Lege alle Komponenten aus der Liste bereit. Arduino IDE öffnen,
           ESP32-Board-Support installieren (Board-Manager → „esp32 by Espressif Systems").
-          Bibliotheken über den Library Manager installieren: <code className="hmy-code">IRremoteESP8266</code> und <code className="hmy-code">U8g2</code>.
+          Bibliotheken über den Library Manager installieren: <code className="hmy-code">IRremoteESP8266</code>,
+          {' '}<code className="hmy-code">U8g2</code> und <code className="hmy-code">FastLED</code>{' '}
+          (für den WS2812B-Streifen). Wer NFC nachrüstet, ergänzt zusätzlich <code className="hmy-code">MFRC522</code>.
+        </p>
+        <p>
+          In <code className="hmy-code">Arduino/lasertag_client/Config.h</code> ganz oben findest du
+          die <strong>QUICK-CONFIG</strong>-Sektion mit den vier Hardware-Schaltern:
+        </p>
+        <pre>{`#define USE_WS2812       1   // 1 = WS2812B-Streifen, 0 = einzelne 5 mm RGB-LED
+#define LED_STRIP_COUNT  30  // Anzahl LEDs im Streifen
+#define HAS_NFC          0   // 1 wenn MFRC522 verlötet
+#define LED_BRIGHTNESS   80  // 0–255, spart Powerbank-Strom`}</pre>
+        <p>
+          Default-Werte passen zum V1-Bauplan mit 30er-Streifen, ohne NFC. Für den
+          Legacy-Modus mit einer einzelnen RGB-LED reicht <code className="hmy-code">USE_WS2812 0</code>{' '}
+          — die Pin-Belegung (GPIO 25 / 26 / 27 über je 330 Ω) ist im selben File
+          weiter unten als Fallback hinterlegt.
         </p>
       </>
     )

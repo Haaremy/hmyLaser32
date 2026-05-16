@@ -117,6 +117,27 @@ Built into the ESP32 core (no install needed): `WiFi`, `esp_now`, `esp_wifi`,
 
 ---
 
+## Quick-config
+
+The first lines of `lasertag_client/Config.h` are the only ones you
+normally edit per build. Everything else (peer count, timings, message
+type IDs, etc.) stays untouched. Per-device identity is auto-negotiated.
+
+```cpp
+// LED-Hardware
+#define USE_WS2812       1   // 1 = WS2812B strip, 0 = single 5 mm RGB LED
+#define LED_STRIP_COUNT  30  // strip length (LEDs), only relevant if USE_WS2812 = 1
+#define LED_BRIGHTNESS   80  // 0..255, caps current draw
+
+// NFC reader (MFRC522)
+#define HAS_NFC          0   // 1 if you wired the reader (see pin diagram)
+```
+
+The hardware pin numbers live just below in the same file, but they
+rarely change on a NodeMCU-32S.
+
+---
+
 ## Upload settings
 
 | Setting | Value |

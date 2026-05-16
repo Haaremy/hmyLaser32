@@ -4,50 +4,77 @@
 #include <Arduino.h>
 
 // ============================================================================
-//   hmyLaser32 — Client-Konfiguration (v4.1)
-//   - Auto-Identity via MAC-Aushandlung (keine MY_NAME-Hardcoding mehr)
-//   - Master-Election für Standalone-Lobby (niedrigste MAC → Master,
-//     broadcastet MSG_STANDALONE, andere syncen ihre Timer)
+//   hmyLaser32 — Client-Konfiguration
+//   Alles was du normalerweise pro Build anpasst, steht in der QUICK-CONFIG
+//   weiter unten. Die Spielerdaten werden ab v4 automatisch ausgehandelt —
+//   keine Hardcoding von MY_NAME / MY_IR_COMMAND mehr.
 // ============================================================================
+
+// ──────────────────────────────────────────────────────────────────────────
+//   QUICK-CONFIG — die einzigen Schalter, die du normalerweise umsetzen musst
+// ──────────────────────────────────────────────────────────────────────────
+
+// LED-Hardware
+//   1 = WS2812B-Streifen (Standard, v4.2)
+//   0 = einzelne 5 mm RGB-LED (Legacy, vor v4.2)
+#define USE_WS2812 1
+
+// Anzahl LEDs im Streifen (nur relevant bei USE_WS2812 = 1)
+#define LED_STRIP_COUNT 30
+
+// NFC-Reader (MFRC522)
+//   1 = vorhanden, NFC-Account-Binding aktiv
+//   0 = nicht vorhanden (Default, V1-Bauplan ohne NFC)
+#define HAS_NFC 0
+
+// Helligkeit des WS2812B-Streifens (0–255). Reduziert Stromverbrauch.
+#define LED_BRIGHTNESS 80
+
+// ──────────────────────────────────────────────────────────────────────────
+//   Hardware-Pinout — selten zu ändern, gilt für NodeMCU-32S
+// ──────────────────────────────────────────────────────────────────────────
+
+// IR
+constexpr uint16_t IR_SEND_PIN = 4;
+constexpr uint16_t IR_RECV_PIN = 14;
+
+// Button
+//   Default GPIO 32 (NFC-kompatibel — GPIO 19 wäre dort MISO blockiert).
+//   Wer KEIN NFC nutzt, kann den Button alternativ auf GPIO 19 setzen.
+constexpr uint16_t BUTTON_PIN = 32;
+
+// WS2812B-Datenleitung (gilt wenn USE_WS2812 = 1)
+constexpr uint16_t LED_DATA_PIN = 26;
+
+// Legacy 5 mm RGB-LED-Pins (gilt wenn USE_WS2812 = 0)
+constexpr uint16_t RGB_RED_PIN   = 25;
+constexpr uint16_t RGB_GREEN_PIN = 26;
+constexpr uint16_t RGB_BLUE_PIN  = 27;
+constexpr bool     RGB_COMMON_ANODE = false;
+
+// NFC (MFRC522 via SPI, nur relevant wenn HAS_NFC = 1)
+constexpr uint16_t NFC_SS_PIN  = 5;
+constexpr uint16_t NFC_RST_PIN = 33;
+// SPI-Pins: MOSI=23, MISO=19, SCK=18 (Hardware-SPI VSPI)
+
+// OLED I²C (Pins 21=SDA, 22=SCL — über Wire.begin in setup)
+
+// ──────────────────────────────────────────────────────────────────────────
+//   Konstanten — sollten i.d.R. unverändert bleiben
+// ──────────────────────────────────────────────────────────────────────────
 
 constexpr uint8_t WIFI_CHANNEL = 1;
 constexpr int MAX_PEERS = 20;
 constexpr int MAX_PLAYERS = 10;
 constexpr int MAX_TEAMS = 4;
 
-// --- Pin-Belegung (NodeMCU-32S) -------------------------------------------
-// Default-Pinout (v4.2):
-//   Button   → GPIO 32 (free GPIO 19 für optionalen MFRC522-MISO)
-//   Wer keinen NFC-Reader nutzt, kann BUTTON_PIN auch auf 19 lassen.
-constexpr uint16_t IR_SEND_PIN = 4;
-constexpr uint16_t IR_RECV_PIN = 14;
-constexpr uint16_t BUTTON_PIN  = 32;
+// Make the QUICK-CONFIG flags available as constexpr too
+constexpr int      LED_COUNT      = LED_STRIP_COUNT;
 
-// --- LEDs: WS2812B-Streifen (Standard) oder einzelne 5mm RGB-LED ---------
-// USE_WS2812 = 1: WS2812B-Streifen am LED_DATA_PIN (V1-Standard)
-//             0: 3 PWM-Pins für eine 5mm-RGB-LED (Legacy-Modus)
-#define USE_WS2812 1
-constexpr uint16_t LED_DATA_PIN  = 26;      // Datenleitung zum WS2812B-Streifen
-constexpr int      LED_COUNT     = 30;      // Anzahl LEDs im Streifen
-constexpr uint8_t  LED_BRIGHTNESS = 80;     // 0-255 — Helligkeit (spart Strom)
-
-// Legacy 5mm RGB-LED Pins (nur relevant wenn USE_WS2812 == 0)
-constexpr uint16_t RGB_RED_PIN   = 25;
-constexpr uint16_t RGB_GREEN_PIN = 26;
-constexpr uint16_t RGB_BLUE_PIN  = 27;
-constexpr bool     RGB_COMMON_ANODE = false;
-
-// --- NFC (optional, Hardware nicht im V1-Bauplan) -------------------------
-#define HAS_NFC 0
-constexpr uint16_t NFC_SS_PIN  = 5;
-constexpr uint16_t NFC_RST_PIN = 33;
-// Wer NFC nutzen will: HAS_NFC=1, BUTTON_PIN auf 32 verlegen
-// SPI-Pins: MOSI=23, MISO=19, SCK=18 (Hardware-SPI VSPI)
-
-// --- IR-Identifikation ----------------------------------------------------
+// IR
 constexpr uint16_t IR_GAME_ADDRESS = 0x00FF;
 
-// --- ESP-NOW Message-Typen ------------------------------------------------
+// ESP-NOW Message-Typen
 constexpr uint8_t MSG_DISCOVERY  = 0;
 constexpr uint8_t MSG_TABLE      = 1;
 constexpr uint8_t MSG_PHASE      = 2;
@@ -55,13 +82,13 @@ constexpr uint8_t MSG_TEAMS      = 3;
 constexpr uint8_t MSG_NFC        = 4;
 constexpr uint8_t MSG_STANDALONE = 5;   // v4.1 — Lobby-Master Konsens
 
-// --- Match-Phasen ---------------------------------------------------------
+// Match-Phasen
 constexpr uint8_t PHASE_IDLE   = 0;
 constexpr uint8_t PHASE_LOBBY  = 1;
 constexpr uint8_t PHASE_ACTIVE = 2;
 constexpr uint8_t PHASE_DONE   = 3;
 
-// --- Timing ---------------------------------------------------------------
+// Timing
 constexpr unsigned long DEBOUNCE_MS = 50;
 constexpr unsigned long SELF_HIT_IGNORE_MS = 200;
 constexpr unsigned long HIT_DISABLE_MS = 5000;
@@ -69,18 +96,16 @@ constexpr unsigned long PHASE_TIMEOUT_MS = 5000;
 constexpr unsigned long TEAMS_TIMEOUT_MS = 8000;
 constexpr unsigned long HIT_BLINK_INTERVAL_MS = 120;
 
-// Identity-Aushandlung: warte 5s nach letztem neuen Peer (mehr Toleranz
-// für späte Discoveries), aber sende Discovery alle 1s in den ersten 15s
-// (für schnelles gegenseitiges Finden), danach alle 5s.
-constexpr unsigned long IDENTITY_WAIT_MS         = 5000;
+// Identity-Aushandlung
+constexpr unsigned long IDENTITY_WAIT_MS           = 5000;
 constexpr unsigned long DISCOVERY_FAST_INTERVAL_MS = 1000;
 constexpr unsigned long DISCOVERY_SLOW_INTERVAL_MS = 5000;
 constexpr unsigned long DISCOVERY_FAST_PHASE_MS    = 15000;
 
-// --- Stand-Alone-Lobby ----------------------------------------------------
+// Stand-Alone-Lobby
 constexpr unsigned long STANDALONE_LOBBY_SECONDS = 60;
 constexpr unsigned long STANDALONE_MATCH_SECONDS = 300;
-constexpr unsigned long STANDALONE_TIMEOUT_MS    = 4000;   // master ohne MSG_STANDALONE
-constexpr unsigned long STANDALONE_BROADCAST_MS  = 1000;   // master sendet 1×/s
+constexpr unsigned long STANDALONE_TIMEOUT_MS    = 4000;
+constexpr unsigned long STANDALONE_BROADCAST_MS  = 1000;
 
 #endif
