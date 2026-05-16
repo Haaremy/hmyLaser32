@@ -2,42 +2,45 @@ import { getTranslations } from 'next-intl/server';
 
 type Component = { name: string; qty: string; hint: string; source: string };
 
+// Hinweis: Die Bezugsquellen sind die tatsächlich vom Autor (Jeremy Becker)
+// für den V1-Prototyp verwendeten Produkte. Andere kompatible Module
+// funktionieren ebenfalls — bitte technische Eckdaten vergleichen.
 const components: Component[] = [
   {
     name: 'ESP32 NodeMCU-32S',
     qty: '1×',
-    hint: 'Dual-Core 240 MHz, WLAN, ESP-NOW, per USB programmierbar.',
-    source: 'https://www.az-delivery.de/products/nodemcu-esp32'
+    hint: 'Dual-Core 240 MHz, WLAN, ESP-NOW, per USB programmierbar. Spar-Tipp: Mehrpack — pro Spieler braucht es eins, plus optional ein Server-ESP.',
+    source: 'https://www.amazon.de/dp/B0D8635YZ6'
   },
   {
     name: 'TSOP38238 IR-Empfänger',
     qty: '1×',
     hint: 'Bis 45 m Reichweite, 38 kHz. Auf das Brustmodul nach vorne.',
-    source: 'https://www.reichelt.de/ir-empfaenger-tsop-38238-tsop-38238-p118534.html'
+    source: 'https://www.tme.eu/de/details/tsop38238/ir-empfangermodule/vishay/'
   },
   {
     name: 'KY-005 IR-Sender-Modul',
     qty: '1×',
     hint: '940 nm, direkt am ESP-GPIO ohne MOSFET schaltbar. Sitzt in der Pistolenmündung.',
-    source: 'https://www.az-delivery.de/products/ir-infrarot-sender-modul-ky-005'
+    source: 'https://www.amazon.de/dp/B0F9L3SZ97'
   },
   {
     name: 'SSD1306 OLED 0.96″ I²C',
     qty: '1×',
     hint: '128 × 64 Pixel, zeigt Name / Score / Rank.',
-    source: 'https://www.az-delivery.de/products/0-96zolldisplay'
+    source: 'https://www.amazon.de/dp/B01L9GC470'
   },
   {
     name: 'Taster (Mikroschalter)',
     qty: '1×',
     hint: 'Auslöseknopf an Pistole. Pull-Up auf GPIO 19.',
-    source: 'https://www.reichelt.de/de/de/inhalt.html?ACTION=446&LA=2&q=taster%20miniatur'
+    source: 'https://www.amazon.de/dp/B07XWYHPZH'
   },
   {
     name: '5 mm RGB-LED, gemeinsame Kathode',
     qty: '1×',
     hint: 'Status-LED am Brustmodul. 3 PWM-Pins (25/26/27).',
-    source: 'https://www.reichelt.de/de/de/inhalt.html?ACTION=446&q=rgb%20led%205mm%20gemeinsame%20kathode'
+    source: 'https://www.amazon.de/dp/B0897LDR9N'
   },
   {
     name: 'Widerstand 330 Ω',
@@ -66,13 +69,19 @@ const components: Component[] = [
   {
     name: 'Weste / Trägermaterial',
     qty: '1×',
-    hint: 'Befestigung des Brustmoduls mit IR-Empfänger.',
+    hint: 'Befestigung des Brustmoduls mit IR-Empfänger. Im V1 wurde eine taktische Weste mit MOLLE-Schlaufen verwendet.',
+    source: 'https://www.amazon.de/dp/B0F6Y2MSXN'
+  },
+  {
+    name: 'MFRC522 NFC-Reader (optional)',
+    qty: '1×',
+    hint: 'Für Account-Binding via NFC-Karte. SPI: VSPI (SCK 18 / MISO 19 / MOSI 23 / SS 5 / RST 33). Bei Verwendung muss BUTTON_PIN von 19 auf 32 verlegt werden.',
     source: ''
   },
   {
     name: 'NFC-Karte (Mifare Classic 1K, optional)',
     qty: '1×',
-    hint: 'Speichert username + nfcToken aus dem Account.',
+    hint: 'Speichert username|token aus dem Account.',
     source: 'https://www.reichelt.de/de/de/inhalt.html?ACTION=446&q=mifare%201k%20karte'
   }
 ];
