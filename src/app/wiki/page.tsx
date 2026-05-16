@@ -8,40 +8,46 @@ export default async function WikiIndexPage() {
       <h1>{t('title')}</h1>
       <p>{t('intro')}</p>
 
-      <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h3 style={{ marginTop: 0 }}>📄 {t('paper_v1')}</h3>
-          <p style={{ margin: 0 }}>Entwicklung eines lokalen Multiplayer Lasertag Games — Jeremy Becker, HS&nbsp;Anhalt</p>
-        </div>
-        <a className="btn btn-primary" href="/papers/Lasertag_Paper_V1.pdf" download>
-          Download PDF (2.3&nbsp;MB)
-        </a>
-      </div>
-
-      <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h3 style={{ marginTop: 0 }}>📄 {t('paper_v2')}</h3>
-          <p style={{ margin: 0, color: 'var(--color-text-muted)' }}>{t('paper_v2_coming_soon')}</p>
-        </div>
-        <span className="btn" style={{ opacity: 0.5, cursor: 'not-allowed' }}>Coming soon</span>
-      </div>
-
+      <h2 style={{ marginTop: '2rem' }}>🛠 Bauanleitung — was tatsächlich gebaut wird</h2>
+      <p style={{ marginTop: 0, color: 'var(--color-text-secondary)' }}>
+        Schritt-für-Schritt für den finalen Prototyp: Hardware-Liste, Verdrahtung,
+        Firmware-Flash und erste Inbetriebnahme.
+      </p>
       <div className="grid grid-2">
-        <Link href="/wiki/hardware" className="feature">
-          <h3>🔌 {t('hardware')}</h3>
-          <p>Funktionsanalyse Equipment · IR-Sender/Empfänger-Vergleich · Mikrocontroller</p>
+        <Link href="/wiki/build/hardware" className="feature">
+          <h3>🔌 Hardware</h3>
+          <p>Finale Komponentenliste — was im aktuellen Build wirklich verbaut ist.</p>
         </Link>
-        <Link href="/wiki/architecture" className="feature">
-          <h3>🧩 {t('architecture')}</h3>
-          <p>ESP-NOW Peer-to-Peer · Gossip-Protokoll · Punkteauswertung · Datenaustausch</p>
+        <Link href="/wiki/build/wiring" className="feature">
+          <h3>🪛 Verdrahtung</h3>
+          <p>Pin-Belegung, Steckbrett-Schema, Lötanleitung für Pistole + Brustmodul.</p>
         </Link>
-        <Link href="/wiki/build-guide" className="feature">
-          <h3>🛠 {t('build_guide')}</h3>
-          <p>Steckbrett → Lochplatine · Pin-Belegung · Brustmodul + Laserpistole</p>
+        <Link href="/wiki/build/firmware" className="feature">
+          <h3>💾 Firmware</h3>
+          <p>Arduino-Setup, Module-Übersicht, Konfiguration pro Spieler, Flash-Anleitung.</p>
         </Link>
-        <Link href="/wiki/components" className="feature">
-          <h3>📦 {t('components')}</h3>
-          <p>Komponenten-Vergleich · Bauteilliste · Bezugsquellen</p>
+        <Link href="/wiki/build/run" className="feature">
+          <h3>🎯 Erstes Spiel</h3>
+          <p>ESP-Server koppeln, Lobby-Timer, Match starten, Live-Status verfolgen.</p>
+        </Link>
+      </div>
+
+      <h2 style={{ marginTop: '3rem' }}>📑 Wissenschaftliche Arbeit — was untersucht wurde</h2>
+      <p style={{ marginTop: 0, color: 'var(--color-text-secondary)' }}>
+        Die Konzeption, der Komponenten-Vergleich und die Messreihen, die zur finalen
+        Hardware-Wahl geführt haben. Lehrmaterial — kein 1:1-Build-Manual.
+      </p>
+      <div className="grid grid-2">
+        <Link href="/wiki/research/paper-v1" className="feature">
+          <h3>📄 Paper V1 — Lokales Multiplayer Lasertag</h3>
+          <p>
+            Funktionsanalyse, Komponenten-Vergleich (6 IR-Sender / 4 Empfänger / 7 Controller),
+            ESP-NOW + Gossip, Reichweitenmessungen indoor/outdoor.
+          </p>
+        </Link>
+        <Link href="/wiki/research/paper-v2" className="feature">
+          <h3>📄 Paper V2 — Erweiterung</h3>
+          <p style={{ color: 'var(--color-text-muted)' }}>{t('paper_v2_coming_soon')}</p>
         </Link>
       </div>
     </>

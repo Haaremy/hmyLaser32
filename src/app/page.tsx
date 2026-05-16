@@ -32,7 +32,7 @@ export default async function HomePage() {
         <p className="subtitle">{t('subtitle')}</p>
 
         <div className="quicklinks">
-          <Link href="/wiki/build-guide" className="quicklink">🛠 {t('wiki_short')}</Link>
+          <Link href="/wiki/build/run" className="quicklink">🛠 {t('wiki_short')}</Link>
           <Link href="/profile" className="quicklink">👤 {t('profile_short')}</Link>
         </div>
       </section>
