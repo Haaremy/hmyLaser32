@@ -10,6 +10,7 @@ bool isShootingAllowed();
 bool handleTrigger();
 bool handleIrReceiver();
 void updateRespawnDisplayState(bool disabledNow, bool &wasPlayerDisabled);
+void resetRuntimeStatsForNewMatch();
 
 // v4: Standalone-Lobby/Match Konsens-Timer. peerCountIncludingSelf = unique
 // MAC-Adressen die der Client zur Zeit kennt (eigene zählt mit).

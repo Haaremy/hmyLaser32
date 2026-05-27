@@ -6,6 +6,11 @@ export const knownPlayerSchema = z.object({
   command: z.number().int().min(1).max(254),
   playerId: z.number().int().nonnegative(),
   points: z.number().int().optional().default(0),
+  shots: z.number().int().nonnegative().optional().default(0),
+  rxHits: z.number().int().nonnegative().optional().default(0),
+  team: z.number().int().min(1).max(10).optional(),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  nfcToken: z.string().min(1).max(64).optional(),
   lastSeenSec: z.number().int().nonnegative().optional().default(0)
 });
 

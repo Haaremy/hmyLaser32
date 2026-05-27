@@ -17,6 +17,8 @@ const char *identityMyName();
 uint32_t    identityMyColor();
 uint8_t     identityMyCommand();
 bool        identityIsAssigned();
+void        identitySetName(const char *name);
+void        identitySetColor(uint32_t color);
 
 void identityPeerSeen(const uint8_t *mac, bool isServer);
 

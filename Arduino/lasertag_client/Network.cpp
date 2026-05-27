@@ -2,10 +2,12 @@
 #include <cstring>
 #include "Config.h"
 #include "Display.h"
+#include "Game.h"
 #include "Globals.h"
 #include "Identity.h"
 #include "LasertagNetwork.h"
 #include "Led.h"
+#include "Nfc.h"
 #include "Ranking.h"
 
 bool peerExists(const uint8_t *mac) {
@@ -19,7 +21,7 @@ void addPeer(const uint8_t *mac) {
   if (peerExists(mac) || peerCount >= MAX_PEERS) return;
   esp_now_peer_info_t peerInfo = {};
   memcpy(peerInfo.peer_addr, mac, 6);
-  peerInfo.channel = WIFI_CHANNEL;
+  peerInfo.channel = 0;
   peerInfo.encrypt = false;
   if (esp_now_add_peer(&peerInfo) == ESP_OK) {
     memcpy(knownPeers[peerCount], mac, 6);
@@ -44,11 +46,14 @@ static void handlePhase(const Message &m) {
   uint8_t prevPhase = g_phase;
   g_phase = newPhase;
   g_phaseSecondsLeft = (uint32_t)(m.entries[0].points < 0 ? 0 : m.entries[0].points);
+  if (m.playerCount > 1 && m.entries[1].points > 0) {
+    g_hitPoints = m.entries[1].points;
+  }
   g_phaseLastUpdate = millis();
   strlcpy(g_phaseMode, m.entries[0].player, sizeof(g_phaseMode));
   if (prevPhase != newPhase) {
     if (newPhase == PHASE_LOBBY) {
-      shotsFired = 0; hitCount = 0; myPoints = 0;
+      resetRuntimeStatsForNewMatch();
       memset(ranking, 0, sizeof(ranking));
     }
     applyTeamColor();
@@ -98,12 +103,48 @@ static void handleStandalone(const Message &m, const uint8_t *srcMac) {
     Serial.printf("[STANDALONE] Synced from master: phase %u -> %u (%lu s left)\n",
                   prevPhase, newPhase, secsLeft);
     if (newPhase == PHASE_LOBBY) {
-      shotsFired = 0; hitCount = 0; myPoints = 0;
+      resetRuntimeStatsForNewMatch();
       memset(ranking, 0, sizeof(ranking));
     }
     applyTeamColor();
     updateDisplay();
   }
+}
+
+static void handlePlayerConfig(const Message &m) {
+  uint32_t myId = getMyPlayerId();
+  uint8_t myCmd = identityMyCommand();
+  for (int i = 0; i < m.playerCount && i < MAX_PLAYERS; i++) {
+    const RankingEntry &e = m.entries[i];
+    if (e.playerId != myId) continue;
+    uint32_t color = e.lastUpdate & 0x00FFFFFFu;
+    if (color != 0) {
+      g_myAssignedColor = color;
+      identitySetColor(color);
+    }
+    g_myTeamIndex = (int8_t)e.points;
+    if (e.player[0] != '\0') identitySetName(e.player);
+    Serial.printf("[CONFIG] cmd=%u team=%d color=#%06lx name=%s\n",
+                  (unsigned)myCmd, (int)g_myTeamIndex, (unsigned long)color, identityMyName());
+    broadcastPlayerState();
+    return;
+  }
+}
+
+static bool mergeRankingEntries(const Message &m) {
+  bool changed = false;
+  for (int i = 0; i < m.playerCount && i < MAX_PLAYERS; i++) {
+    if (m.entries[i].player[0] == '\0') continue;
+    if (upsertRankingEntry(m.entries[i].playerId,
+                           m.entries[i].player,
+                           m.entries[i].points,
+                           m.entries[i].lastUpdate)) changed = true;
+  }
+  if (changed) {
+    syncMyPointsFromRanking();
+    updateDisplay();
+  }
+  return changed;
 }
 
 void processIncomingMessage(const uint8_t *srcAddr, const uint8_t *data, int len) {
@@ -117,6 +158,7 @@ void processIncomingMessage(const uint8_t *srcAddr, const uint8_t *data, int len
 
   switch (incoming.msgType) {
     case MSG_DISCOVERY:
+      mergeRankingEntries(incoming);
       queueTableBroadcast();
       return;
     case MSG_PHASE:
@@ -125,23 +167,16 @@ void processIncomingMessage(const uint8_t *srcAddr, const uint8_t *data, int len
     case MSG_TEAMS:
       handleTeams(incoming);
       return;
+    case MSG_PLAYER_CONFIG:
+      handlePlayerConfig(incoming);
+      return;
     case MSG_STANDALONE:
       handleStandalone(incoming, srcAddr);
       return;
     case MSG_NFC:
       return;
     case MSG_TABLE: {
-      bool changed = false;
-      for (int i = 0; i < incoming.playerCount && i < MAX_PLAYERS; i++) {
-        if (incoming.entries[i].player[0] == '\0') continue;
-        if (upsertRankingEntry(incoming.entries[i].playerId,
-                               incoming.entries[i].player,
-                               incoming.entries[i].points,
-                               incoming.entries[i].lastUpdate)) changed = true;
-      }
-      if (changed) {
-        syncMyPointsFromRanking();
-        updateDisplay();
+      if (mergeRankingEntries(incoming)) {
         queueTableBroadcast();
       }
       return;
@@ -166,7 +201,15 @@ void sendDiscovery() {
   memset(&outgoing, 0, sizeof(outgoing));
   strncpy(outgoing.senderName, identityMyName(), sizeof(outgoing.senderName) - 1);
   outgoing.msgType = MSG_DISCOVERY;
-  outgoing.playerCount = 0;
+  if (identityIsAssigned()) {
+    outgoing.playerCount = 1;
+    outgoing.entries[0].playerId = getMyPlayerId();
+    strncpy(outgoing.entries[0].player, identityMyName(), sizeof(outgoing.entries[0].player) - 1);
+    outgoing.entries[0].points = myPoints;
+    outgoing.entries[0].lastUpdate = millis();
+  } else {
+    outgoing.playerCount = 0;
+  }
   esp_now_send(broadcast, reinterpret_cast<const uint8_t *>(&outgoing), sizeof(outgoing));
 }
 
@@ -183,6 +226,53 @@ void broadcastRankingTable() {
   esp_now_send(broadcast, reinterpret_cast<const uint8_t *>(&outgoing), sizeof(outgoing));
   lastTableBroadcast = millis();
   pendingTableBroadcast = false;
+}
+
+static void copyChunk(char *dst, size_t dstLen, const char *src, int chunk) {
+  if (!src || !dst || dstLen == 0) return;
+  strncpy(dst, src + (chunk * 11), dstLen - 1);
+  dst[dstLen - 1] = '\0';
+}
+
+void broadcastPlayerState() {
+  if (!identityIsAssigned()) return;
+  const uint8_t broadcast[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+  Message m = {};
+  strlcpy(m.senderName, identityMyName(), sizeof(m.senderName));
+  m.msgType = MSG_PLAYER_STATE;
+  m.playerCount = 6;
+  m.entries[0].playerId = getMyPlayerId();
+  strlcpy(m.entries[0].player, identityMyName(), sizeof(m.entries[0].player));
+  m.entries[0].points = myPoints;
+  m.entries[0].lastUpdate = millis();
+
+  m.entries[1].playerId = (g_myAssignedColor ? g_myAssignedColor : identityMyColor()) & 0x00FFFFFFu;
+  m.entries[1].points = (int16_t)(shotsFired > 32767 ? 32767 : shotsFired);
+  m.entries[1].lastUpdate = (uint32_t)(hitCount > 65535 ? 65535 : hitCount);
+
+  m.entries[2].points = g_myTeamIndex;
+  const char *token = nfcLastToken();
+  for (int i = 0; i < 4; i++) {
+    copyChunk(m.entries[i + 2].player, sizeof(m.entries[i + 2].player), token, i);
+  }
+  esp_now_send(broadcast, reinterpret_cast<const uint8_t *>(&m), sizeof(m));
+}
+
+void broadcastHitEvent(uint32_t shooterId, const char *shooterName, int points) {
+  const uint8_t broadcast[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+  Message m = {};
+  strlcpy(m.senderName, identityMyName(), sizeof(m.senderName));
+  m.msgType = MSG_HIT_EVENT;
+  m.playerCount = 2;
+  m.entries[0].playerId = shooterId;
+  strlcpy(m.entries[0].player, shooterName, sizeof(m.entries[0].player));
+  m.entries[0].points = (int16_t)points;
+  m.entries[0].lastUpdate = millis();
+  m.entries[1].playerId = getMyPlayerId();
+  strlcpy(m.entries[1].player, identityMyName(), sizeof(m.entries[1].player));
+  m.entries[1].points = (int16_t)(hitCount > 32767 ? 32767 : hitCount);
+  m.entries[1].lastUpdate = (uint32_t)(shotsFired > 65535 ? 65535 : shotsFired);
+  esp_now_send(broadcast, reinterpret_cast<const uint8_t *>(&m), sizeof(m));
 }
 
 // v4.1 — Master broadcastet aktuelle Standalone-Phase + Restzeit

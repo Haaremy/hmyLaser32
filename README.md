@@ -1,321 +1,232 @@
-# hmyLaser32 — DIY Lasertag
+# hmyLaser32 - DIY Lasertag
 
-A self-hosted Lasertag system built around the ESP32 with an online portal for
-profiles, statistics and live spectating.
+A self-hosted ESP32 Lasertag system with a local ESP server, ESP-NOW player
+clients, NFC player binding, and an optional Next.js web portal for profiles,
+live statistics, and match history.
 
-- 🎯 **Live**: <https://laser32.haaremy.de>
-- 📄 **Paper V1** (final design): [`Lasertag_Paper.pdf`](./Lasertag_Paper.pdf)
-- 📝 **Paper V2** (extension, in progress)
+- Live portal: <https://laser32.haaremy.de>
+- Paper V1: [`Lasertag_Paper.pdf`](./Lasertag_Paper.pdf)
+- Firmware docs: [`Arduino/README.md`](./Arduino/README.md)
+- Web portal notes: [`README_WEBSITE.md`](./README_WEBSITE.md)
 
-> **Status (2026-05-16):** Client + Server firmware in `Arduino/`. Both build
-> with Arduino IDE 2.x / PlatformIO. Web portal is a Next.js 14 app deployed
-> on Proxmox LXC 128/129 behind a Cloudflare-proxied vhost on LXC 124.
+## Current Status
 
----
+The repository contains:
 
-## Table of contents
-
-1. [What is it?](#what-is-it)
-2. [Architecture](#architecture)
-3. [Repository layout](#repository-layout)
-4. [Quick start — players](#quick-start--players)
-5. [Quick start — developers](#quick-start--developers)
-6. [Firmware](#firmware)
-7. [Web portal](#web-portal)
-8. [Bridge API reference](#bridge-api-reference)
-9. [State of the project / current limitations](#state-of-the-project)
-10. [Notes for AI agents](#notes-for-ai-agents)
-
----
-
-## What is it?
-
-A Lasertag set replicates the indoor-arena experience with cheap hardware
-(~€25 per player). Each player carries:
-
-- a **pistol** with an IR-LED that fires a coded NEC pulse on a trigger press
-- a **chest module** with an IR receiver, an OLED status display and an RGB
-  status LED
-
-A separate **bridge ESP** acts as a server that orchestrates matches and
-forwards live data to the web portal. The portal records players, statistics
-and a live feed. The client firmware also works **completely stand-alone**
-(no server, no internet) — in that case the ESP-NOW Gossip protocol keeps the
-score tables in sync between the player units.
-
----
+- Player firmware for ESP32 clients with IR shooting, two IR receiver zones,
+  OLED display, WS2812B strip, optional NFC login, and ESP-NOW sync.
+- Server firmware for an ESP32 bridge with permanent AP + captive portal,
+  WLAN setup, local game administration, ESP-NOW orchestration, and HTTPS
+  forwarding to the web portal.
+- A Next.js 14 web portal with Prisma/PostgreSQL for registered players,
+  ESP servers, live matches, leaderboards, and account/NFC management.
 
 ## Architecture
 
-```
-                                ┌─────────────────────────┐
-                                │  laser32.haaremy.de     │
-                                │  (Next.js + Postgres)   │
-                                └────────────┬────────────┘
-                                             │  HTTPS (Bearer = PIN)
-                            HTTP register / hit / match start+end
-                                             │
-                                ┌────────────┴────────────┐
-                                │   ESP-Server (bridge)   │
-                                │  • Captive Portal AP    │
-                                │  • STA → home WiFi      │
-                                │  • mDNS hmylaser32.local│
-                                │  • ESP-NOW listener     │
-                                │  • Match state machine  │
-                                └────────────┬────────────┘
-                                             │
-                                ESP-NOW broadcast (Channel 1)
-                                ┌────────────┴────────────┐
-                                │                         │
-                       ┌────────┴───────┐         ┌──────┴─────────┐
-                       │  Client ESP #1 │  …      │  Client ESP #N │
-                       │  • IR sender   │         │  • OLED        │
-                       │  • IR receiver │         │  • RGB-LED     │
-                       │  • Trigger btn │         │  • Button      │
-                       └────────────────┘         └────────────────┘
-                              │   IR-NEC pulses                ▲
-                              └────────  fire ────────────────►
+```text
+Player ESPs
+  - IR NEC shots
+  - local hit detection
+  - ESP-NOW player state, hit events, ranking gossip
+        |
+        | ESP-NOW broadcast
+        v
+ESP Server
+  - permanent AP/captive portal
+  - WLAN STA bridge
+  - match phase authority
+  - player color/team sync
+  - live stats aggregation
+        |
+        | HTTPS Bearer PIN
+        v
+Next.js Portal + PostgreSQL
+  - server registration
+  - live match view
+  - player/NFC accounts
+  - historical stats
 ```
 
-**Three communication paths**:
+## Repository Layout
 
-1. **IR-NEC** (player ↔ player): trigger sends a 32-bit NEC code carrying the
-   shooter's player ID. The receiving player parses it, awards points to the
-   shooter and goes into a 5-second respawn lock.
-2. **ESP-NOW Gossip** (peer-to-peer + server-broadcast): every client
-   periodically rebroadcasts its full ranking table; the server listens and
-   diffs the tables to detect new hits. The server additionally broadcasts
-   `MSG_PHASE` with the current match phase so clients can show a countdown.
-3. **HTTPS Bridge** (server ↔ web portal): the server registers itself,
-   forwards hit events during an active match, posts the final stats and
-   pulls match settings/start requests from the portal.
-
----
-
-## Repository layout
-
-```
+```text
 .
-├── Arduino/
-│   ├── README.md                ← detailed firmware docs
-│   ├── lasertag_client/         ← player ESP sketch (modular)
-│   └── lasertag_server/         ← bridge ESP sketch (modular)
-│
-├── prisma/schema.prisma         ← User, EspServer, Match, MatchPlayer,
-│                                  Team, HitEvent
-├── src/                         ← Next.js 14 app (App Router, TypeScript)
-├── public/                      ← static assets + hmyDesign tokens
-├── server.mjs                   ← custom Next entry (HTTP + WebSocket)
-├── Dockerfile + docker-compose  ← self-hosted deploy template
-├── Lasertag_Paper.pdf           ← Paper V1 (final design)
-├── Lasertag_Paper_V1.zip        ← LaTeX sources for V1
-└── Lasertag_Paper_Erweiterung*  ← V2 sources (in progress)
+|-- Arduino/
+|   |-- README.md
+|   |-- lasertag_client/   # player ESP sketch
+|   `-- lasertag_server/   # bridge/server ESP sketch
+|-- prisma/schema.prisma   # User, EspServer, Match, MatchPlayer, Team, HitEvent
+|-- src/                   # Next.js app router, API routes, UI
+|-- public/                # static assets
+|-- server.mjs             # custom HTTP + WebSocket entry
+|-- Dockerfile
+|-- docker-compose.yml
+|-- README_WEBSITE.md
+`-- Lasertag_Paper*.*
 ```
 
-See [`Arduino/README.md`](./Arduino/README.md) for the firmware module
-breakdown and protocol specifics.
+## Local ESP Server Portal
 
----
+The ESP server opens an AP named `hmyLaser32-XXXX` and serves the captive
+portal at `http://192.168.4.1`. The AP stays available even after the server
+joins a configured WLAN.
 
-## Quick start — players
+The local portal now has two tabs:
 
-1. Build a player set following the [DIY cookbook](https://laser32.haaremy.de/diy)
-   on the web portal — same content lives in [`Arduino/README.md`](./Arduino/README.md).
-2. Flash `lasertag_client/` to each player ESP, setting a unique `MY_NAME`
-   and `MY_IR_COMMAND` per device.
-3. Flash `lasertag_server/` to a dedicated bridge ESP, power it via a
-   powerbank — at first boot it opens an **open AP** `hmyLaser32-XXXX`.
-4. Connect a phone to the AP, the captive portal opens at `192.168.4.1`.
-5. Scan for your home WLAN, enter the password, save.
-6. The ESP reboots, connects, registers itself at
-   <https://laser32.haaremy.de> and appears on the landing page.
-7. Open the server's card on the portal → tab **Einstellungen** → enter the
-   PIN shown on the captive portal → click **Match jetzt starten**.
-8. A 60-second lobby phase starts (visible on the client OLEDs); after that
-   the active match runs.
+- `Spiel`: operational match control.
+  - `Warteraum starten`
+  - distribution time and match duration in seconds
+  - points per hit
+  - match mode dropdown: `Alle gegen Alle` or `Team-Modus`
+  - known player table with color, device ID, name, and team
+  - `Aktualisieren` syncs player color/team assignments to clients
+  - `Match starten` activates a lobby match
+  - live table: `Rank | Spieler | Shots | RX Hits | Punkte`
+- `Einstellungen`: server info and WLAN setup only.
+  - server name/PIN
+  - AP and STA information
+  - WLAN scan/save/forget
 
-> The captive-portal AP stays available **permanently** — even after the
-> ESP has joined your home WiFi. You can always come back to
-> `http://192.168.4.1` from a phone connected to `hmyLaser32-XXXX`, or via
-> `http://hmylaser32-<name>.local/` from inside your home WiFi.
+There is intentionally no early match abort button.
 
----
+## Firmware Data Flow
 
-## Quick start — developers
+The shared ESP-NOW `Message` struct remains binary-compatible. New behavior is
+implemented through additional `MSG_*` message types instead of enlarging the
+wire struct.
+
+Important message types:
+
+| Type | Direction | Purpose |
+|---|---|---|
+| `MSG_DISCOVERY` | client -> all | announce presence, optionally with self entry |
+| `MSG_TABLE` | client -> all | legacy ranking table sync |
+| `MSG_PHASE` | server -> clients | match phase, remaining seconds, mode, hit points |
+| `MSG_TEAMS` | server -> clients | team colors and member bitmasks |
+| `MSG_NFC` | client -> server | scanned `name + UUID` chunks |
+| `MSG_STANDALONE` | client -> clients | no-server lobby consensus |
+| `MSG_PLAYER_STATE` | client -> server | name, points, shots, RX hits, color, team, NFC token |
+| `MSG_PLAYER_CONFIG` | server -> clients | assigned name/color/team from portal |
+| `MSG_HIT_EVENT` | client -> server | shooter, target, points, receiver stats |
+
+Players become known to the server when they appear in discovery/table/state
+messages. The ESP server does not persist players; it only persists WLAN,
+identity, and local match defaults.
+
+## Game Rules
+
+- A valid hit gives the shooter `hitPoints` points, default `10`.
+- `hitPoints` can be changed in the ESP local portal and in the web settings.
+- `Shots` is the number of trigger pulls sent by a client.
+- `RX Hits` is the number of hits received by a client.
+- Team-mode friendly fire is ignored.
+- Free-for-all uses each player's own color/team number mainly as display data.
+- Team mode can use up to 10 team slots; when one player color in a team is
+  changed locally, the server applies that color to all players in that team.
+
+## NFC Binding
+
+Optional NFC cards use this payload format:
+
+```text
+username|uuid-token
+```
+
+When scanned, the client:
+
+- changes its local display name to `username`
+- sends the full token in ESP-NOW chunks to the server
+- continues sending that name/token in player state updates
+
+The local ESP portal displays the name only. The UUID is forwarded to the web
+portal so it can link match data to registered accounts.
+
+## Web Portal Quick Start
 
 ```bash
-# Web portal
 npm install
-cp .env.example .env             # fill DATABASE_URL, SESSION_SECRET, …
+cp .env.example .env
+# Fill DATABASE_URL and SESSION_SECRET. SESSION_SECRET must be >= 32 chars.
+npx prisma generate
 npx prisma migrate deploy
 npm run build
-node server.mjs                  # custom entry, serves HTTP + WS on :3000
-
-# Or via docker-compose
-docker compose up --build
+node server.mjs
 ```
+
+During local development without migrations you can use:
 
 ```bash
-# Firmware (Arduino IDE)
-File → Open → Arduino/lasertag_client/lasertag_client.ino
-File → Open → Arduino/lasertag_server/lasertag_server.ino
-Tools → Board → ESP32 → ESP32 Dev Module (or NodeMCU-32S)
-Tools → Upload Speed → 115200
-Tools → Erase all Flash before Upload → Yes
-Sketch → Upload
+npx prisma db push
+npm run dev
 ```
 
-Required libraries (install via Library Manager):
+The current schema includes `EspServer.hitPoints`. Existing databases must be
+migrated or pushed before the updated app can use the field.
 
-| Library | Used in |
-|---|---|
-| `IRremoteESP8266` | client (IR send/recv NEC) |
-| `U8g2` | client (OLED) |
-| `Preferences` | server (NVS — already part of esp32 core) |
-| `ESPmDNS` | server (mDNS — already part of esp32 core) |
+## Firmware Quick Start
 
----
+Use Arduino IDE 2.x or PlatformIO with the Espressif ESP32 Arduino core.
 
-## Firmware
+Required client libraries:
 
-Full reference: [`Arduino/README.md`](./Arduino/README.md).
+- `IRremoteESP8266`
+- `U8g2`
+- `FastLED`
+- `MFRC522` only when `HAS_NFC=1`
 
-| Sketch | Role | Hardware |
+Open and upload:
+
+```text
+Arduino/lasertag_client/lasertag_client.ino
+Arduino/lasertag_server/lasertag_server.ino
+```
+
+For development, enable "Erase all Flash before Upload" when you need to wipe
+stored WLAN credentials, server identity, PIN, or match defaults.
+
+## Bridge API Overview
+
+Bridge endpoints authenticate with:
+
+```http
+Authorization: Bearer <server-pin>
+```
+
+| Method | Endpoint | Purpose |
 |---|---|---|
-| `lasertag_client` | Player. IR pistol + chest receiver + OLED + RGB-LED + button | ESP32 + TSOP38238 + KY-005 + SSD1306 + 5mm RGB common-cathode + 330Ω × 3 + powerbank |
-| `lasertag_server` | Bridge. AP+STA, captive portal, mDNS, ESP-NOW listener, HTTPS bridge | ESP32 + powerbank (no IR hardware) |
+| `POST` | `/api/bridge/register` | server self-registration |
+| `GET` | `/api/bridge/register` | heartbeat |
+| `POST` | `/api/bridge/match/start` | create active match |
+| `POST` | `/api/bridge/match/end` | finish match and upload final stats |
+| `POST` | `/api/bridge/hit` | live hit event |
+| `POST` | `/api/bridge/players` | known/live player state |
+| `GET` | `/api/bridge/player/[nfcToken]` | NFC account lookup |
+| `GET` | `/api/esp/by-pin/settings` | ESP pulls defaults and start requests |
 
-**Match state machine (server-side):**
+## Verification
 
+The web project currently builds with:
+
+```powershell
+$env:SESSION_SECRET='0123456789abcdef0123456789abcdef'
+npm run build
 ```
-IDLE  ──(matchStart, web or local)──►  LOBBY (60 s, broadcast countdown)
-LOBBY ──(lobby timer)──►  ACTIVE (matchSeconds, hits are forwarded)
-ACTIVE ──(match timer | abort)──►  DONE (stats posted to portal)
-DONE  ──(matchStart)──►  LOBBY
-```
 
-The phase is broadcast over ESP-NOW (`MSG_PHASE`) every ~1.5 s so clients
-can render a countdown and block shots outside the active window. Clients
-fall back to standalone behaviour (all phases treated as ACTIVE) if no
-phase message arrives within 5 s — the original v1 paper design.
+`arduino-cli` is not part of this repository; firmware compilation should be
+verified in Arduino IDE or PlatformIO after changing ESP32 dependencies.
 
----
+## Notes For Contributors
 
-## Web portal
-
-Next.js 14 App Router + TypeScript + Prisma + PostgreSQL + iron-session +
-argon2 + next-intl (DE/EN).
-
-| Route | Purpose |
-|---|---|
-| `/` | List of ESP servers, online state, active match |
-| `/research` | Paper V1 + V2 cards with download + read-online |
-| `/research/paper-v1` | Full web view of the V1 paper |
-| `/diy` | Cookbook build guide (ingredients, tools, 7 numbered steps) |
-| `/champions` | Global leaderboard with filter: Overall / Hits / Matches / K/D |
-| `/account` | Login/Register tabs, after login: profile + NFC token + stats |
-| `/esp/[id]` | Server overview + settings tab (PIN-gated) + Match starter |
-| `/match/[id]` | Live view: countdown timer, leaderboard, feed; settings tab |
-
-The portal follows the hmyDesign system: component classes are `hmy-btn`,
-`hmy-card__header`, `hmy-tabs`, `hmy-input` etc., and Lasertag-specific
-extensions are prefixed `hmy-lt-*`.
-
----
-
-## Bridge API reference
-
-All endpoints accept JSON. Bridge endpoints authenticate with
-`Authorization: Bearer <pin>` — the PIN is generated by the ESP server on
-first boot and shown on its captive portal page.
-
-| Method | Endpoint | Auth | Body / Use |
-|---|---|---|---|
-| `POST` | `/api/bridge/register` | — | `{ name, pin }` — self-register. `200` rebind, `201` new, `409` conflict |
-| `GET`  | `/api/bridge/register` | Bearer | heartbeat |
-| `POST` | `/api/bridge/match/start` | Bearer | `{ mode, durationSeconds, teams? }` → `{ matchId }` |
-| `POST` | `/api/bridge/match/end` | Bearer | `{ matchId, players[] }` |
-| `POST` | `/api/bridge/hit` | Bearer | `{ matchId, shooterNfc?, targetNfc?, points }` |
-| `GET`  | `/api/bridge/player/[nfcToken]` | Bearer | look up player by NFC |
-| `GET`  | `/api/bridge/ws` | upgrade | WebSocket; `?token=<pin>` |
-| `GET`  | `/api/esp/by-pin/settings` | Bearer | pull match defaults + `startRequested` flag (consumed atomically) |
-| `GET`  | `/api/esp/[id]/settings` | public | read server defaults |
-| `POST` | `/api/esp/[id]/settings` | body.pin | edit defaults |
-| `POST` | `/api/esp/[id]/start` | body.pin | request a match start (ESP picks it up on next pull) |
-| `GET`  | `/api/match/[id]/live` | public | live state + leaderboard + feed |
-| `GET`  | `/api/match/[id]/settings` | public | per-match settings |
-| `POST` | `/api/match/[id]/settings` | body.pin | edit per-match settings |
-
----
-
-## State of the project
-
-### Working
-
-- ✅ Player client (v2) — IR pistol, OLED, RGB-LED, ESP-NOW gossip, phase-aware
-- ✅ Server (v2) — AP+STA dualmode, captive portal, WLAN scan with persistence,
-  mDNS, ESP-NOW listener, HTTPS bridge, match state machine, settings pull
-- ✅ Web portal — landing page, research, DIY, account, champions, match,
-  ESP detail with PIN-gated settings + Match-Start
-- ✅ Live match smoke test against Test-ESP `BlueWolf-7` (PIN `4815`)
-- ✅ Self-hosted on LXC 128 (app, 10.0.3.50) + LXC 129 (Postgres, 10.0.3.51)
-  behind LXC 124 (Apache reverse-proxy) at `laser32.haaremy.de`
-
-### Known limitations
-
-- **TLS pinning**: the firmware uses `WiFiClientSecure::setInsecure()` for
-  the HTTPS connection to the portal. Production-ready setup needs the
-  Cloudflare root CA pinned (`setCACert`). Not a problem for a LAN demo.
-- **Channel mismatch**: ESP-NOW runs on the channel the WiFi STA picks. If
-  your home router uses anything but channel 1, set `WIFI_CHANNEL` in the
-  client to match the channel the server actually ends up on (visible on
-  the captive-portal page after STA-connect).
-- **Score-diff hit forwarding**: the server detects hits by diffing the
-  per-player point totals broadcast by clients. It cannot reliably tell who
-  the *target* was — that information is local to the receiving client. A
-  future client extension (v3) should add a `hit_event` message with both
-  shooter and target.
-- **No enclosure** in V1 — components sit on perfboard, wires are visible.
-  V2 paper covers mechanical design.
-
-### Roadmap
-
-- 🛠 Client v3: send `hit_event` with explicit `targetNfc`.
-- 🛠 Server v3: optional OLED + button extension.
-- 📦 Mechanical design (enclosures, wearable rig) — Paper V2 deliverable.
-- 🔐 TLS pinning in the bridge HTTPS client.
-- 📲 Companion mobile app for spectator-mode push.
-
----
-
-## Notes for AI agents
-
-The code is structured for easy navigation and modification:
-
-- **Every module has a focused responsibility.** Don't add cross-module
-  state — keep new state in `Globals.h` (firmware) or `lib/` (web).
-- **Wire format is shared between client and server**: `Types.h` in both
-  Arduino sketches *must* stay binary-compatible. If you add fields, do it
-  via `MSG_*` constants and reuse the `entries[]` slots, never extend the
-  struct.
-- **Adding a new bridge endpoint**: add the route in `src/app/api/...`, mirror
-  the contract in `Arduino/lasertag_server/Bridge.{h,cpp}`, document it in
-  the [Bridge API table](#bridge-api-reference).
-- **CSS conventions**: stick to hmyDesign tokens (`var(--hmy-color-...)`) and
-  the BEM class naming (`hmy-card__header`, `hmy-btn--primary`). Local extensions
-  use the `hmy-lt-*` prefix to keep them grep-able.
-- **PIN handling**: the ESP-Server PIN is the *only* secret on the device.
-  Never log it, never put it in URLs.
-- **Channel `1` is hard-coded** in the client. Match it on the server side
-  via `WIFI_CHANNEL` in `Arduino/lasertag_server/Config.h`. When the server
-  joins a STA WiFi on a different channel, ESP-NOW follows the STA channel
-  — both have to align.
-- **Test-ESP**: `BlueWolf-7` with PIN `4815` is registered in the production
-  database for smoke testing. Delete it when going live.
-
----
+- Keep `Types.h` binary-compatible between client and server.
+- Prefer new `MSG_*` types over growing the ESP-NOW struct.
+- Do not persist player rosters on the ESP server; the web portal is the
+  long-term statistics store.
+- The server PIN is the bridge secret. Do not put it into URLs.
+- The ESP32 AP and STA share one WiFi channel. Clients auto-detect the server
+  AP where possible, but channel mismatch remains the first thing to check when
+  ESP-NOW seems silent.
 
 ## License
 
-The code in this repository is open source. The papers are © Jeremy Becker,
-Hochschule Anhalt. Please don't republish the PDFs without permission.
+Code in this repository is open source. The papers are copyright Jeremy Becker,
+Hochschule Anhalt. Please do not republish the PDFs without permission.

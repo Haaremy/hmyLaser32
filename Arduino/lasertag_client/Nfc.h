@@ -22,6 +22,7 @@ void nfcLoop();
 
 // Read-only: was wurde zuletzt eingelesen + Status der Auflösung
 const char *nfcLastUsername();      // "" wenn nichts gescannt
+const char *nfcLastToken();         // "" wenn nichts gescannt
 bool        nfcIsBound();           // true wenn Account erfolgreich gemappt
 
 #endif

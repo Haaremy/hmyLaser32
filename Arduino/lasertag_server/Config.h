@@ -10,7 +10,7 @@
 // --- ESP-NOW ---------------------------------------------------------------
 constexpr uint8_t WIFI_CHANNEL = 1;
 constexpr int MAX_PLAYERS = 10;
-constexpr int MAX_TEAMS   = 4;
+constexpr int MAX_TEAMS   = 10;
 
 // --- Web-Portal (Cloud-Bridge) ---------------------------------------------
 constexpr char PORTAL_BASE_URL[] = "https://laser32.haaremy.de";
@@ -38,6 +38,7 @@ constexpr char MDNS_PREFIX[]      = "hmylaser32";
 // --- Match-Defaults --------------------------------------------------------
 constexpr unsigned long DEFAULT_LOBBY_SECONDS    = 60;    // Starttimer
 constexpr unsigned long DEFAULT_MATCH_SECONDS    = 300;   // Runden-Dauer
+constexpr int           DEFAULT_HIT_POINTS       = 10;
 constexpr char          DEFAULT_MATCH_MODE[]     = "free-for-all";
 
 // --- Periodische Tasks -----------------------------------------------------

@@ -68,50 +68,100 @@ bool handleTrigger() {
       shotsFired++;
       Serial.printf("[SHOT] %s sent NEC 0x%lx, shot #%d\n",
                     identityMyName(), (unsigned long)myPlayerId, shotsFired);
+      broadcastPlayerState();
       updateDisplay();
     }
   }
   return true;
 }
 
-bool handleIrReceiver() {
-  if (!irrecv.decode(&results)) return true;
+static void resetHitCounters() {
+  hitCount = 0;
+  hitCountPrimary = 0;
+  hitCountSecondary = 0;
+}
 
-  if (results.decode_type != NEC || results.bits != 32) {
-    irrecv.resume();
+static int teamIndexForPlayer(uint32_t playerId) {
+  uint8_t cmd = (uint8_t)((playerId >> 8) & 0xFF);
+  bool teamsFresh = g_teamCount > 0 && (millis() - g_teamsLastUpdate) < TEAMS_TIMEOUT_MS;
+  if (!teamsFresh) return -1;
+  uint32_t bit = (cmd >= 1 && cmd <= 32) ? (1u << (cmd - 1)) : 0u;
+  if (!bit) return -1;
+  for (uint8_t i = 0; i < g_teamCount; i++) {
+    if (g_teams[i].memberBits & bit) return i;
+  }
+  return -1;
+}
+
+static bool isFriendlyFire(uint32_t shooterPlayerId) {
+  if (strcmp(g_phaseMode, "team") != 0) return false;
+  int shooterTeam = teamIndexForPlayer(shooterPlayerId);
+  int myTeam = teamIndexForPlayer(getMyPlayerId());
+  return shooterTeam >= 0 && myTeam >= 0 && shooterTeam == myTeam;
+}
+
+static bool handleIrReceiverInput(IRrecv &receiver,
+                                  decode_results &decoded,
+                                  const char *sensorName,
+                                  int &sensorHitCount) {
+  if (!receiver.decode(&decoded)) return true;
+
+  if (decoded.decode_type != NEC || decoded.bits != 32) {
+    receiver.resume();
     return false;
   }
 
-  const uint32_t shooterId = irsend.encodeNEC(results.address, results.command);
+  const uint32_t shooterId = irsend.encodeNEC(decoded.address, decoded.command);
   const char *shooterName = findPlayerNameById(shooterId);
   char shooterNameCopy[12] = {};
   const bool withinSelfHitWindow = millis() - lastShotAt < SELF_HIT_IGNORE_MS;
   if (shooterName) {
     strncpy(shooterNameCopy, shooterName, sizeof(shooterNameCopy) - 1);
     shooterNameCopy[sizeof(shooterNameCopy) - 1] = '\0';
+  } else {
+    uint8_t cmd = (uint8_t)((shooterId >> 8) & 0xFF);
+    snprintf(shooterNameCopy, sizeof(shooterNameCopy), "Cmd%03u", (unsigned)cmd);
   }
 
-  if (results.address != IR_GAME_ADDRESS) {
+  if (decoded.address != IR_GAME_ADDRESS) {
   } else if (isPlayerDisabled()) {
   } else if (!isShootingAllowed()) {
   } else if (shooterId == getMyPlayerId() && withinSelfHitWindow) {
-  } else if (shooterId != getMyPlayerId()) {
+  } else if (shooterId != getMyPlayerId() && !isFriendlyFire(shooterId)) {
     hitCount++;
+    sensorHitCount++;
     playerDisabledUntil = millis() + HIT_DISABLE_MS;
     uint32_t shooterColor = resolveShooterColor(shooterId);
     triggerHitBlink(shooterColor);
-    Serial.printf("[HIT] from %s (color #%06lx)\n",
+    Serial.printf("[HIT:%s] from %s (color #%06lx, sensor hits %d/%d)\n",
+                  sensorName,
                   shooterNameCopy[0] ? shooterNameCopy : "?",
-                  (unsigned long)shooterColor);
+                  (unsigned long)shooterColor,
+                  hitCountPrimary,
+                  hitCountSecondary);
 
-    if (shooterName != nullptr && awardPointsToPlayer(shooterId, shooterNameCopy, 10)) {
+    if (awardPointsToPlayer(shooterId, shooterNameCopy, g_hitPoints)) {
       queueTableBroadcast();
     }
+    broadcastHitEvent(shooterId, shooterNameCopy, g_hitPoints);
+    broadcastPlayerState();
     updateDisplay();
   }
 
-  irrecv.resume();
+  receiver.resume();
   return true;
+}
+
+bool handleIrReceiver() {
+  bool primaryOk = handleIrReceiverInput(irrecv, results, "IR1", hitCountPrimary);
+  bool secondaryOk = handleIrReceiverInput(irrecvSecondary, resultsSecondary, "IR2", hitCountSecondary);
+  return primaryOk && secondaryOk;
+}
+
+void resetRuntimeStatsForNewMatch() {
+  shotsFired = 0;
+  myPoints = 0;
+  resetHitCounters();
 }
 
 void updateRespawnDisplayState(bool disabledNow, bool &wasPlayerDisabled) {
@@ -166,7 +216,7 @@ void standaloneStateTick(int peerCountIncludingSelf) {
         Serial.printf("[STANDALONE] Master starts LOBBY (%lus)\n",
                       (unsigned long)STANDALONE_LOBBY_SECONDS);
         memset(ranking, 0, sizeof(ranking));
-        hitCount = 0; shotsFired = 0; myPoints = 0;
+        resetRuntimeStatsForNewMatch();
         updateDisplay();
       }
       break;

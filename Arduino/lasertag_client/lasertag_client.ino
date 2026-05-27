@@ -31,7 +31,9 @@
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 IRsend irsend(IR_SEND_PIN);
 IRrecv irrecv(IR_RECV_PIN);
+IRrecv irrecvSecondary(IR_RECV_PIN_SECONDARY);
 decode_results results;
+decode_results resultsSecondary;
 
 bool lastButtonState = HIGH;
 bool lastRawButtonReading = HIGH;
@@ -39,6 +41,8 @@ unsigned long lastDebounce = 0;
 unsigned long lastDisplayRefreshAt = 0;
 
 int hitCount = 0;
+int hitCountPrimary = 0;
+int hitCountSecondary = 0;
 int shotsFired = 0;
 int myPoints = 0;
 unsigned long lastShotAt = 0;
@@ -53,16 +57,39 @@ unsigned long lastTableBroadcast = 0;
 volatile bool sendStatusPending = false;
 volatile esp_now_send_status_t lastSendStatus = ESP_NOW_SEND_FAIL;
 
+static uint8_t detectEspNowChannel() {
+  int bestRssi = -1000;
+  uint8_t bestChannel = WIFI_CHANNEL;
+  int n = WiFi.scanNetworks(false, true, false, 250);
+  for (int i = 0; i < n; i++) {
+    String ssid = WiFi.SSID(i);
+    if (!ssid.startsWith(SERVER_AP_SSID_PREFIX)) continue;
+    int rssi = WiFi.RSSI(i);
+    int channel = WiFi.channel(i);
+    if (channel > 0 && rssi > bestRssi) {
+      bestRssi = rssi;
+      bestChannel = (uint8_t)channel;
+    }
+  }
+  WiFi.scanDelete();
+  Serial.printf("[ESP-NOW] Channel selected: %u%s\n",
+                (unsigned)bestChannel,
+                bestRssi > -1000 ? " (server AP detected)" : " (fallback)");
+  return bestChannel;
+}
+
 // Phase (v2/v3)
 uint8_t  g_phase = PHASE_IDLE;
 uint32_t g_phaseSecondsLeft = 0;
 unsigned long g_phaseLastUpdate = 0;
 char g_phaseMode[16] = "free-for-all";
+int16_t g_hitPoints = DEFAULT_HIT_POINTS;
 
 // Teams (v3)
 TeamDef g_teams[MAX_TEAMS] = {};
 uint8_t g_teamCount = 0;
 int8_t  g_myTeamIndex = -1;
+uint32_t g_myAssignedColor = 0;
 unsigned long g_teamsLastUpdate = 0;
 
 // Hit-Blink (v4)
@@ -88,18 +115,15 @@ void setup() {
   u8g2.sendBuffer();
 
   pinMode(BUTTON_PIN, INPUT_PULLUP);
-#if !USE_WS2812
-  pinMode(RGB_RED_PIN, OUTPUT);
-  pinMode(RGB_GREEN_PIN, OUTPUT);
-  pinMode(RGB_BLUE_PIN, OUTPUT);
-#endif
   setLedNormalState();
   irsend.begin();
   irrecv.enableIRIn();
+  irrecvSecondary.enableIRIn();
 
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
-  esp_wifi_set_channel(WIFI_CHANNEL, WIFI_SECOND_CHAN_NONE);
+  uint8_t espNowChannel = detectEspNowChannel();
+  esp_wifi_set_channel(espNowChannel, WIFI_SECOND_CHAN_NONE);
 
   identityInit();
   nfcBegin();
@@ -111,7 +135,7 @@ void setup() {
   esp_now_peer_info_t broadcastPeer = {};
   const uint8_t broadcast[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
   memcpy(broadcastPeer.peer_addr, broadcast, 6);
-  broadcastPeer.channel = WIFI_CHANNEL;
+  broadcastPeer.channel = 0;
   broadcastPeer.encrypt = false;
   esp_now_add_peer(&broadcastPeer);
 
@@ -154,6 +178,7 @@ void loop() {
 
   if (pendingTableBroadcast && millis() - lastTableBroadcast > 300) {
     broadcastRankingTable();
+    broadcastPlayerState();
   }
   if (millis() - lastPeriodicBroadcast > 10000) {
     queueTableBroadcast();

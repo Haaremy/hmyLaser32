@@ -21,7 +21,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   const server = await db.espServer.findUnique({
     where: { id: params.id },
     select: {
-      id: true, name: true, mode: true, lobbySeconds: true, matchSeconds: true,
+      id: true, name: true, mode: true, lobbySeconds: true, matchSeconds: true, hitPoints: true,
       teams: true, startRequested: true, lastSeen: true, online: true
     }
   });
@@ -34,6 +34,7 @@ const schema = z.object({
   mode: z.enum(['free-for-all', 'team']).optional(),
   lobbySeconds: z.number().int().min(5).max(600).optional(),
   matchSeconds: z.number().int().min(30).max(3600).optional(),
+  hitPoints: z.number().int().min(1).max(100).optional(),
   teams: teamsSchema.optional()
 });
 
@@ -53,9 +54,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       mode: body.mode ?? server.mode,
       lobbySeconds: body.lobbySeconds ?? server.lobbySeconds,
       matchSeconds: body.matchSeconds ?? server.matchSeconds,
+      hitPoints: body.hitPoints ?? server.hitPoints,
       teams: body.teams !== undefined ? (body.teams as Prisma.InputJsonValue) : undefined
     },
-    select: { id: true, mode: true, lobbySeconds: true, matchSeconds: true, teams: true }
+    select: { id: true, mode: true, lobbySeconds: true, matchSeconds: true, hitPoints: true, teams: true }
   });
 
   // WS-Broadcast an Browser-Subscribers

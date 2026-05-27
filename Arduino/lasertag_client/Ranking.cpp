@@ -47,12 +47,13 @@ bool shouldReplaceEntry(const RankingEntry &currentEntry, const RankingEntry &in
     return false;
   }
 
-  if (incomingEntry.lastUpdate > currentEntry.lastUpdate) {
+  // Punkte sind monoton steigend. `lastUpdate` kommt von millis() des
+  // jeweiligen ESP und ist geraeteuebergreifend nicht direkt vergleichbar.
+  if (incomingEntry.points > currentEntry.points) {
     return true;
   }
 
-  if (incomingEntry.lastUpdate == currentEntry.lastUpdate &&
-      incomingEntry.points > currentEntry.points) {
+  if (incomingEntry.lastUpdate > currentEntry.lastUpdate) {
     return true;
   }
 

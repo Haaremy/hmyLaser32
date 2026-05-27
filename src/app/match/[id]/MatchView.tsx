@@ -160,9 +160,8 @@ export function MatchView({ matchId }: { matchId: string }) {
             <div className="hmy-lt-lb-row is-head">
               <div>#</div>
               <div>{t('players')}</div>
-              <div style={{ textAlign: 'right' }}>K/D</div>
-              <div style={{ textAlign: 'right' }}>%</div>
-              <div style={{ textAlign: 'right' }}>{t('shot')}</div>
+              <div style={{ textAlign: 'right' }}>Shots</div>
+              <div style={{ textAlign: 'right' }}>RX Hits</div>
               <div style={{ textAlign: 'right' }}>{t('score')}</div>
             </div>
             {state.leaderboard.length === 0 ? (
@@ -181,9 +180,8 @@ export function MatchView({ matchId }: { matchId: string }) {
                       </span>
                     )}
                   </div>
-                  <div className="hmy-lt-num">{p.kd}</div>
-                  <div className="hmy-lt-num">{p.accuracy === null ? '—' : `${p.accuracy}%`}</div>
-                  <div className="hmy-lt-num">{p.hits}</div>
+                  <div className="hmy-lt-num">{p.shotsFired}</div>
+                  <div className="hmy-lt-num">{p.deaths}</div>
                   <div className="hmy-lt-num hmy-lt-points">{p.points}</div>
                 </div>
               ))

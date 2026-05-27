@@ -10,21 +10,25 @@ void matchLoadSettings() {
   String mode = storageGetString("mode", DEFAULT_MATCH_MODE);
   uint32_t lobby = storageGetU32("lobby", DEFAULT_LOBBY_SECONDS);
   uint32_t mlen  = storageGetU32("match", DEFAULT_MATCH_SECONDS);
+  uint32_t points = storageGetU32("hitpts", DEFAULT_HIT_POINTS);
   strlcpy(g_settings.mode, mode.c_str(), sizeof(g_settings.mode));
   g_settings.lobbySeconds = lobby;
   g_settings.matchSeconds = mlen;
+  g_settings.hitPoints = (int16_t)points;
   // teams werden NICHT aus NVS persistiert — sie kommen via Settings-Pull
   // vom Webservice (Source of Truth). Lokale Änderungen sind ephemer.
   g_settings.teamCount = 0;
   memset(g_settings.teams, 0, sizeof(g_settings.teams));
-  LT_LOG("Settings: mode=%s lobby=%lu match=%lu",
-         g_settings.mode, (unsigned long)g_settings.lobbySeconds, (unsigned long)g_settings.matchSeconds);
+  LT_LOG("Settings: mode=%s lobby=%lu match=%lu hitPoints=%d",
+         g_settings.mode, (unsigned long)g_settings.lobbySeconds,
+         (unsigned long)g_settings.matchSeconds, (int)g_settings.hitPoints);
 }
 
 void matchSaveSettings() {
   storageSetString("mode", g_settings.mode);
   storageSetU32("lobby", g_settings.lobbySeconds);
   storageSetU32("match", g_settings.matchSeconds);
+  storageSetU32("hitpts", (uint32_t)g_settings.hitPoints);
 }
 
 bool matchStart() {
@@ -37,6 +41,7 @@ bool matchStart() {
   g_lobbyEndsAtMs = millis() + g_settings.lobbySeconds * 1000UL;
   LT_LOG("Lobby phase started (%lu s)", (unsigned long)g_settings.lobbySeconds);
   espNowBroadcastTeams();   // Teams sofort an Clients
+  espNowBroadcastPlayerConfig();
   espNowBroadcastPhase();   // Phase sofort
   return true;
 }
@@ -52,8 +57,8 @@ bool matchEnd() {
              (unsigned long)g_snapshots[i].playerId);
     pls[count].nfc    = nfcBuf[count];
     pls[count].team   = nullptr;
-    pls[count].hits   = 0;
-    pls[count].deaths = 0;
+    pls[count].hits   = g_settings.hitPoints > 0 ? g_snapshots[i].lastPoints / g_settings.hitPoints : 0;
+    pls[count].deaths = g_snapshots[i].rxHits;
     pls[count].points = g_snapshots[i].lastPoints;
     count++;
   }
@@ -110,6 +115,7 @@ void matchLoop() {
       (g_matchPhase == MATCH_LOBBY || g_matchPhase == MATCH_ACTIVE) &&
       millis() - lastTeamsCast > TEAMS_BROADCAST_MS) {
     espNowBroadcastTeams();
+    espNowBroadcastPlayerConfig();
     lastTeamsCast = millis();
   }
 }

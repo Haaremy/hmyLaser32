@@ -8,6 +8,9 @@
 void addPeer(const uint8_t *mac);
 void sendDiscovery();
 void broadcastRankingTable();
+void broadcastPlayerState();
+void broadcastHitEvent(uint32_t shooterId, const char *shooterName, int points);
+void broadcastStandaloneState();
 void handleSendStatusLog();
 
 #if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3

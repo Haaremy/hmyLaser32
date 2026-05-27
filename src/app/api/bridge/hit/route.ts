@@ -64,6 +64,22 @@ export async function POST(req: Request) {
       console.error('upsert shooter stats', (e as Error).message);
     }
   }
+  if (data.targetNfc) {
+    try {
+      await db.matchPlayer.upsert({
+        where: { matchId_nfcToken: { matchId: data.matchId, nfcToken: data.targetNfc } },
+        update: { deaths: { increment: 1 } },
+        create: {
+          matchId: data.matchId,
+          nfcToken: data.targetNfc,
+          deaths: 1,
+          points: 0
+        }
+      });
+    } catch (e) {
+      console.error('upsert target stats', (e as Error).message);
+    }
+  }
 
   // Broadcast to subscribed browsers
   (globalThis as any).wsHub?.broadcastMatch?.(data.matchId, { type: 'hit' });

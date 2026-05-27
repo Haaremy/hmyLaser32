@@ -12,6 +12,7 @@ void espNowBroadcastPhase();
 
 // Teams-Broadcast (current team definitions). Wirkt nur, wenn g_settings.teamCount > 0.
 void espNowBroadcastTeams();
+void espNowBroadcastPlayerConfig();
 
 int espNowGetRanking(PlayerSnapshot *out);
 

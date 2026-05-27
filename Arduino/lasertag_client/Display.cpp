@@ -114,11 +114,11 @@ void updateDisplay() {
   if (tn) {
     snprintf(line, sizeof(line), "Team: %s", tn); u8g2.drawStr(0, 14, line);
     snprintf(line, sizeof(line), "Pts: %d", myPoints); u8g2.drawStr(0, 28, line);
-    snprintf(line, sizeof(line), "Hits %d  Shots %d", hitCount, shotsFired); u8g2.drawStr(0, 42, line);
+    snprintf(line, sizeof(line), "H:%d I1:%d I2:%d", hitCount, hitCountPrimary, hitCountSecondary); u8g2.drawStr(0, 42, line);
     snprintf(line, sizeof(line), "Rank: %d", getMyRank()); u8g2.drawStr(0, 56, line);
   } else {
     snprintf(line, sizeof(line), "Pts: %d", myPoints); u8g2.drawStr(0, 14, line);
-    snprintf(line, sizeof(line), "Hits rx: %d", hitCount); u8g2.drawStr(0, 28, line);
+    snprintf(line, sizeof(line), "H:%d I1:%d I2:%d", hitCount, hitCountPrimary, hitCountSecondary); u8g2.drawStr(0, 28, line);
     snprintf(line, sizeof(line), "Shots: %d", shotsFired); u8g2.drawStr(0, 42, line);
     snprintf(line, sizeof(line), "Rank: %d", getMyRank()); u8g2.drawStr(0, 56, line);
   }

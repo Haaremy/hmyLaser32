@@ -48,6 +48,7 @@ MatchSettings g_settings = {
   .mode = "free-for-all",
   .lobbySeconds = DEFAULT_LOBBY_SECONDS,
   .matchSeconds = DEFAULT_MATCH_SECONDS,
+  .hitPoints = DEFAULT_HIT_POINTS,
   .teamCount = 0,
   .teams = {}
 };

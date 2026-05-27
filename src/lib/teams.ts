@@ -8,7 +8,7 @@ export const teamSchema = z.object({
   members: z.array(z.number().int().min(1).max(254)).max(10)
 });
 
-export const teamsSchema = z.array(teamSchema).max(4);
+export const teamsSchema = z.array(teamSchema).max(10);
 export type TeamDef = z.infer<typeof teamSchema>;
 
 export function parseTeams(raw: Prisma.JsonValue | null | undefined): TeamDef[] {

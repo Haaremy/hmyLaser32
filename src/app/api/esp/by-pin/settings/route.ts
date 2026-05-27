@@ -16,7 +16,7 @@ export async function GET(req: Request) {
   const server = await db.espServer.findUnique({
     where: { pin },
     select: {
-      id: true, mode: true, lobbySeconds: true, matchSeconds: true,
+      id: true, mode: true, lobbySeconds: true, matchSeconds: true, hitPoints: true,
       teams: true, startRequested: true
     }
   });
@@ -38,6 +38,7 @@ export async function GET(req: Request) {
     mode: server.mode,
     lobbySeconds: server.lobbySeconds,
     matchSeconds: server.matchSeconds,
+    hitPoints: server.hitPoints,
     teams: parseTeams(server.teams),
     startRequested: server.startRequested
   });

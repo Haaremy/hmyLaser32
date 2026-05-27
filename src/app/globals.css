@@ -425,7 +425,7 @@ main {
 /* Leaderboard rows (Match + Champions) */
 .hmy-lt-lb-row {
   display: grid;
-  grid-template-columns: 36px 1fr 60px 60px 70px 80px;
+  grid-template-columns: 36px 1fr 70px 70px 80px;
   gap: var(--hmy-spacing-3);
   align-items: center;
   padding: var(--hmy-spacing-3) var(--hmy-spacing-4);

@@ -29,6 +29,11 @@ constexpr uint8_t MSG_DISCOVERY = 0;
 constexpr uint8_t MSG_TABLE     = 1;
 constexpr uint8_t MSG_PHASE     = 2;
 constexpr uint8_t MSG_TEAMS     = 3;   // NEU v3
+constexpr uint8_t MSG_NFC       = 4;
+constexpr uint8_t MSG_STANDALONE = 5;
+constexpr uint8_t MSG_PLAYER_STATE  = 6;
+constexpr uint8_t MSG_PLAYER_CONFIG = 7;
+constexpr uint8_t MSG_HIT_EVENT     = 8;
 
 // MSG_PHASE slot mapping
 //   entries[0].playerId : MatchPhase (0..3)
@@ -45,7 +50,12 @@ constexpr uint8_t MSG_TEAMS     = 3;   // NEU v3
 struct PlayerSnapshot {
   uint32_t playerId;
   char     player[12];
+  char     nfcToken[40];
   int16_t  lastPoints;
+  uint16_t shotsFired;
+  uint16_t rxHits;
+  uint32_t color;
+  uint8_t  teamIndex;
   uint32_t lastUpdate;
 };
 
@@ -66,6 +76,7 @@ struct MatchSettings {
   char     mode[24];          // "free-for-all" | "team"
   uint32_t lobbySeconds;
   uint32_t matchSeconds;
+  int16_t  hitPoints;
   uint8_t  teamCount;
   TeamDef  teams[MAX_TEAMS];
 };

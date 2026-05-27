@@ -1,6 +1,8 @@
 #include "Nfc.h"
 #include "Config.h"
+#include "Game.h"
 #include "Globals.h"
+#include "Identity.h"
 #include "LasertagNetwork.h"
 
 #if HAS_NFC
@@ -76,28 +78,28 @@ void nfcLoop() {
   *sep = '\0';
   strlcpy(kLastUsername, raw, sizeof(kLastUsername));
   strlcpy(kLastToken,    sep + 1, sizeof(kLastToken));
+  identitySetName(kLastUsername);
 
   Serial.printf("[NFC] scanned username=%s token=%s\n", kLastUsername, kLastToken);
 
-  // MSG_NFC an Server-ESP broadcasten — der Server resolved via Bridge
+  // MSG_NFC an Server-ESP broadcasten.
   Message m = {};
   strlcpy(m.senderName, kLastUsername, sizeof(m.senderName));
   m.msgType = MSG_NFC;
-  m.playerCount = 1;
-  // token wird in entries[0].player[] platziert (max 12 zeichen) — bei UUID
-  // (36 Zeichen) müssen wir splitten. Verwende zusätzlich entries[1] / [2].
-  // Erstmal nur die ersten 12 Zeichen — Server-Resolution kann das prefix-
-  // matchen oder wir gehen direkt über die ESP-NOW-Bridge zum Web.
-  strlcpy(m.entries[0].player, kLastToken, sizeof(m.entries[0].player));
-  // Achtung: in dieser Variante wird der volle Token gekürzt. Für ein
-  // robustes Setup: MSG_NFC mit mehreren entries-Slots (Token-Chunks) oder
-  // direkter HTTP-Push am NFC-Reader vorbei.
+  m.playerCount = 4;
+  m.entries[0].playerId = getMyPlayerId();
+  strlcpy(m.entries[0].player, kLastUsername, sizeof(m.entries[0].player));
+  for (int i = 0; i < 3; i++) {
+    strncpy(m.entries[i + 1].player, kLastToken + (i * 11), sizeof(m.entries[i + 1].player) - 1);
+  }
   const uint8_t broadcast[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
   esp_now_send(broadcast, reinterpret_cast<const uint8_t *>(&m), sizeof(m));
+  broadcastPlayerState();
 
   kBound = true;
 #endif
 }
 
 const char *nfcLastUsername() { return kLastUsername; }
+const char *nfcLastToken()    { return kLastToken; }
 bool        nfcIsBound()      { return kBound; }

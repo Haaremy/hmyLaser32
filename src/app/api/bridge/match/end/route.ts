@@ -14,7 +14,8 @@ const schema = z.object({
         teamName: z.string().max(32).optional(),
         hits: z.number().int().min(0).default(0),
         deaths: z.number().int().min(0).default(0),
-        points: z.number().int().default(0)
+        points: z.number().int().default(0),
+        shotsFired: z.number().int().min(0).optional().default(0)
       })
     )
     .max(64)
@@ -58,7 +59,8 @@ export async function POST(req: Request) {
         teamId: teamId || null,
         hits: p.hits,
         deaths: p.deaths,
-        points: p.points
+        points: p.points,
+        shotsFired: p.shotsFired
       }
     });
   }

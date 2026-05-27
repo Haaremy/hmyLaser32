@@ -4,6 +4,7 @@
 #include "Display.h"
 #include "Globals.h"
 #include "Led.h"
+#include "Ranking.h"
 
 // 30 Namen — wechselbar, müssen aber synchron zwischen allen Clients sein.
 const char *NAME_POOL[NAME_POOL_SIZE] = {
@@ -40,6 +41,7 @@ static int       kPeerCount = 0;
 static uint8_t   kMyMac[6] = {0};
 static bool      kAssigned = false;
 static uint8_t   kMyIndex = 0;
+static uint8_t   kMyCommand = 1;
 static char      kMyName[16] = "Searching...";
 static uint32_t  kMyColor = 0xffffff;
 static unsigned long kLastPeerEvent = 0;
@@ -65,6 +67,15 @@ static void sortPeersByMac() {
       }
     }
   }
+}
+
+static uint8_t fallbackCommandFromMac() {
+  uint8_t h = 0xA5;
+  for (int i = 0; i < 6; i++) {
+    h ^= kMyMac[i];
+    h = (uint8_t)((h << 3) | (h >> 5));
+  }
+  return (uint8_t)((h % 32) + 1);
 }
 
 static void logPeers(const char *tag) {
@@ -116,17 +127,30 @@ void identityPeerSeen(const uint8_t *mac, bool isServer) {
 static void assignIdentity() {
   sortPeersByMac();
   int idx = -1;
+  int clientIdx = 0;
+  int clientCount = 0;
   for (int i = 0; i < kPeerCount; i++) {
-    if (memcmp(kPeers[i].mac, kMyMac, 6) == 0) { idx = i; break; }
+    if (kPeers[i].isServer) continue;
+    if (memcmp(kPeers[i].mac, kMyMac, 6) == 0) idx = clientIdx;
+    clientIdx++;
+    clientCount++;
   }
   if (idx < 0) idx = 0;
   kMyIndex = (uint8_t)idx;
-  strlcpy(kMyName, NAME_POOL[idx % NAME_POOL_SIZE], sizeof(kMyName));
-  kMyColor = COLOR_POOL[idx % COLOR_POOL_SIZE];
+  if (clientCount >= 2) {
+    kMyCommand = (uint8_t)((idx % 32) + 1);
+    strlcpy(kMyName, NAME_POOL[idx % NAME_POOL_SIZE], sizeof(kMyName));
+  } else {
+    kMyCommand = fallbackCommandFromMac();
+    snprintf(kMyName, sizeof(kMyName), "P%02X%02X", kMyMac[4], kMyMac[5]);
+  }
+  kMyColor = COLOR_POOL[(kMyCommand - 1) % COLOR_POOL_SIZE];
   kAssigned = true;
-  Serial.printf("[IDENTITY] *** ASSIGN *** idx=%d name=%s color=#%06lx (peers=%d)\n",
-                idx, kMyName, (unsigned long)kMyColor, kPeerCount);
+  Serial.printf("[IDENTITY] *** ASSIGN *** idx=%d cmd=%u name=%s color=#%06lx (clients=%d peers=%d)\n",
+                idx, (unsigned)kMyCommand, kMyName, (unsigned long)kMyColor,
+                clientCount, kPeerCount);
   logPeers("post-assign");
+  updateMyScore(0);
   applyTeamColor();
   updateDisplay();
 }
@@ -155,16 +179,33 @@ void identityLoop() {
 
 const char *identityMyName()   { return kMyName; }
 uint32_t    identityMyColor()  { return kMyColor; }
-uint8_t     identityMyCommand(){ return (uint8_t)((kMyIndex % 254) + 1); }
+uint8_t     identityMyCommand(){ return kMyCommand; }
 bool        identityIsAssigned(){ return kAssigned; }
+
+void identitySetName(const char *name) {
+  if (!name || name[0] == '\0') return;
+  strlcpy(kMyName, name, sizeof(kMyName));
+  updateMyScore(myPoints);
+  updateDisplay();
+}
+
+void identitySetColor(uint32_t color) {
+  kMyColor = color & 0x00FFFFFFu;
+  applyTeamColor();
+  updateDisplay();
+}
 
 // === Master-Election (v4.1) ==============================================
 // Der Client mit der niedrigsten bekannten MAC ist Master und sendet
 // MSG_STANDALONE 1×/s.
 bool identityIsLobbyMaster() {
   if (!kAssigned || kPeerCount < 2) return false;
-  // Nach assignment ist kPeers[0] (sortiert) der mit kleinster MAC.
-  return memcmp(kPeers[0].mac, kMyMac, 6) == 0;
+  // Nach assignment ist der Client mit der kleinsten MAC Master.
+  for (int i = 0; i < kPeerCount; i++) {
+    if (kPeers[i].isServer) continue;
+    return memcmp(kPeers[i].mac, kMyMac, 6) == 0;
+  }
+  return false;
 }
 
 uint8_t identityPeerCount() { return (uint8_t)kPeerCount; }

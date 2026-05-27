@@ -38,6 +38,7 @@ model EspServer {
   mode           String    @default("free-for-all")
   lobbySeconds   Int       @default(60)   // Starttimer (Verteilzeit)
   matchSeconds   Int       @default(300)  // Runden-Dauer
+  hitPoints      Int       @default(10)
 
   // Teams-Definition für mode="team". JSON-Array:
   //   [{ "name": "Rot", "color": "#dc2626", "members": [1, 3, 5] }, ...]

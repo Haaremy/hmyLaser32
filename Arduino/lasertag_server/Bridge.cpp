@@ -76,6 +76,35 @@ static bool jsonBoolField(const String &json, const char *key, bool fallback) {
   return fallback;
 }
 
+static int findMatchingBracket(const String &s, int openPos, char openChar, char closeChar) {
+  if (openPos < 0 || openPos >= (int)s.length() || s.charAt(openPos) != openChar) return -1;
+  int depth = 0;
+  bool inString = false;
+  bool escaped = false;
+  for (int i = openPos; i < (int)s.length(); i++) {
+    char c = s.charAt(i);
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (c == '\\') {
+        escaped = true;
+      } else if (c == '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (c == '"') {
+      inString = true;
+    } else if (c == openChar) {
+      depth++;
+    } else if (c == closeChar) {
+      depth--;
+      if (depth == 0) return i;
+    }
+  }
+  return -1;
+}
+
 // Parse the "teams":[...] array minimal:
 // erwartet `[{"name":"...","color":"#rrggbb","members":[1,2,3]}, ...]`.
 static void parseTeams(const String &json, TeamDef *teams, uint8_t &outCount) {
@@ -83,14 +112,14 @@ static void parseTeams(const String &json, TeamDef *teams, uint8_t &outCount) {
   int teamsStart = json.indexOf("\"teams\":");
   if (teamsStart < 0) return;
   int arrStart = json.indexOf('[', teamsStart);
-  int arrEnd = json.indexOf(']', arrStart);
+  int arrEnd = findMatchingBracket(json, arrStart, '[', ']');
   if (arrStart < 0 || arrEnd < 0 || arrEnd <= arrStart) return;
 
   int i = arrStart + 1;
   while (i < arrEnd && outCount < MAX_TEAMS) {
     int objStart = json.indexOf('{', i);
     if (objStart < 0 || objStart >= arrEnd) break;
-    int objEnd = json.indexOf('}', objStart);
+    int objEnd = findMatchingBracket(json, objStart, '{', '}');
     if (objEnd < 0 || objEnd > arrEnd) break;
     String obj = json.substring(objStart, objEnd + 1);
 
@@ -178,6 +207,7 @@ bool bridgePullSettings(bool &out_startRequested) {
   long lobby = jsonNumberField(resp, "lobbySeconds", -1);
   long match = jsonNumberField(resp, "matchSeconds", -1);
   bool startReq = jsonBoolField(resp, "startRequested", false);
+  long hitPoints = jsonNumberField(resp, "hitPoints", -1);
 
   bool changed = false;
   if (mode.length() > 0 && mode != String(g_settings.mode)) {
@@ -186,6 +216,7 @@ bool bridgePullSettings(bool &out_startRequested) {
   }
   if (lobby > 0 && (uint32_t)lobby != g_settings.lobbySeconds) { g_settings.lobbySeconds = (uint32_t)lobby; changed = true; }
   if (match > 0 && (uint32_t)match != g_settings.matchSeconds) { g_settings.matchSeconds = (uint32_t)match; changed = true; }
+  if (hitPoints > 0 && (int16_t)hitPoints != g_settings.hitPoints) { g_settings.hitPoints = (int16_t)hitPoints; changed = true; }
 
   // Teams parsen — wir überschreiben immer, weil das JSON die Source of Truth ist
   TeamDef newTeams[MAX_TEAMS] = {};
@@ -210,6 +241,8 @@ bool bridgeStartMatch() {
   body += g_settings.mode;
   body += "\",\"durationSeconds\":";
   body += String((unsigned long)g_settings.matchSeconds);
+  body += ",\"hitPoints\":";
+  body += String((int)g_settings.hitPoints);
 
   if (g_settings.teamCount > 0) {
     body += ",\"teams\":[";
@@ -284,6 +317,22 @@ bool bridgePushKnownPlayers() {
     body += String((unsigned long)g_snapshots[i].playerId);
     body += ",\"points\":";
     body += String((int)g_snapshots[i].lastPoints);
+    body += ",\"shots\":";
+    body += String((unsigned)g_snapshots[i].shotsFired);
+    body += ",\"rxHits\":";
+    body += String((unsigned)g_snapshots[i].rxHits);
+    body += ",\"team\":";
+    body += String((unsigned)g_snapshots[i].teamIndex + 1);
+    char color[8];
+    snprintf(color, sizeof(color), "#%06lx", (unsigned long)(g_snapshots[i].color & 0x00FFFFFFu));
+    body += ",\"color\":\"";
+    body += color;
+    body += "\"";
+    if (g_snapshots[i].nfcToken[0] != '\0') {
+      body += ",\"nfcToken\":\"";
+      body += g_snapshots[i].nfcToken;
+      body += "\"";
+    }
     body += ",\"lastSeenSec\":";
     body += String((unsigned long)((nowMs - g_snapshots[i].lastUpdate) / 1000UL));
     body += "}";

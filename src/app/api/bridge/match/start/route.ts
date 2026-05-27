@@ -9,9 +9,10 @@ const schema = z.object({
   serverName: z.string().min(1).max(64).optional(),
   mode: z.string().min(1).max(32).optional(),
   durationSeconds: z.number().int().positive().max(86400).optional(),
+  hitPoints: z.number().int().positive().max(100).optional(),
   teams: z
     .array(z.object({ name: z.string().min(1).max(32), color: z.string().min(1).max(16) }))
-    .max(8)
+    .max(10)
     .optional()
 });
 
@@ -33,6 +34,7 @@ export async function POST(req: Request) {
       durationSeconds: body.durationSeconds ?? null,
       mode: body.mode ?? null,
       status: 'active',
+      settings: { hitPoints: body.hitPoints ?? 10 },
       teams: body.teams ? { create: body.teams.map((t) => ({ name: t.name, color: t.color })) } : undefined
     },
     include: { teams: true }
