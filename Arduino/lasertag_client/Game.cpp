@@ -24,9 +24,10 @@ unsigned long getDisableTimeLeftMs() {
 
 static uint8_t effectivePhase() {
   if (g_phaseLastUpdate != 0 && (millis() - g_phaseLastUpdate) < PHASE_TIMEOUT_MS) {
+    if (g_phase == PHASE_IDLE) return PHASE_ACTIVE;
     return g_phase;
   }
-  return g_standalonePhase;
+  return PHASE_ACTIVE;
 }
 
 bool isShootingAllowed() {
@@ -79,6 +80,7 @@ static void resetHitCounters() {
   hitCount = 0;
   hitCountPrimary = 0;
   hitCountSecondary = 0;
+  hitCountTertiary = 0;
 }
 
 static int teamIndexForPlayer(uint32_t playerId) {
@@ -103,7 +105,8 @@ static bool isFriendlyFire(uint32_t shooterPlayerId) {
 static bool handleIrReceiverInput(IRrecv &receiver,
                                   decode_results &decoded,
                                   const char *sensorName,
-                                  int &sensorHitCount) {
+                                  int &sensorHitCount,
+                                  int zonePoints) {
   if (!receiver.decode(&decoded)) return true;
 
   if (decoded.decode_type != NEC || decoded.bits != 32) {
@@ -133,17 +136,19 @@ static bool handleIrReceiverInput(IRrecv &receiver,
     playerDisabledUntil = millis() + HIT_DISABLE_MS;
     uint32_t shooterColor = resolveShooterColor(shooterId);
     triggerHitBlink(shooterColor);
-    Serial.printf("[HIT:%s] from %s (color #%06lx, sensor hits %d/%d)\n",
+    Serial.printf("[HIT:%s] from %s (color #%06lx, sensor hits %d/%d/%d, +%d)\n",
                   sensorName,
                   shooterNameCopy[0] ? shooterNameCopy : "?",
                   (unsigned long)shooterColor,
                   hitCountPrimary,
-                  hitCountSecondary);
+                  hitCountSecondary,
+                  hitCountTertiary,
+                  zonePoints);
 
-    if (awardPointsToPlayer(shooterId, shooterNameCopy, g_hitPoints)) {
+    if (awardPointsToPlayer(shooterId, shooterNameCopy, zonePoints)) {
       queueTableBroadcast();
     }
-    broadcastHitEvent(shooterId, shooterNameCopy, g_hitPoints);
+    broadcastHitEvent(shooterId, shooterNameCopy, zonePoints);
     broadcastPlayerState();
     updateDisplay();
   }
@@ -153,9 +158,10 @@ static bool handleIrReceiverInput(IRrecv &receiver,
 }
 
 bool handleIrReceiver() {
-  bool primaryOk = handleIrReceiverInput(irrecv, results, "IR1", hitCountPrimary);
-  bool secondaryOk = handleIrReceiverInput(irrecvSecondary, resultsSecondary, "IR2", hitCountSecondary);
-  return primaryOk && secondaryOk;
+  bool primaryOk = handleIrReceiverInput(irrecv, results, "ZONE1", hitCountPrimary, g_zonePoints[0]);
+  bool secondaryOk = handleIrReceiverInput(irrecvSecondary, resultsSecondary, "ZONE2", hitCountSecondary, g_zonePoints[1]);
+  bool tertiaryOk = handleIrReceiverInput(irrecvTertiary, resultsTertiary, "ZONE3", hitCountTertiary, g_zonePoints[2]);
+  return primaryOk && secondaryOk && tertiaryOk;
 }
 
 void resetRuntimeStatsForNewMatch() {
@@ -191,6 +197,12 @@ void standaloneStateTick(int peerCountIncludingSelf) {
     return;
   }
   if (!identityIsAssigned()) return;
+  (void)peerCountIncludingSelf;
+  if (g_standalonePhase != PHASE_ACTIVE) {
+    g_standalonePhase = PHASE_ACTIVE;
+    updateDisplay();
+  }
+  return;
 
   unsigned long now = millis();
   bool iAmMaster = identityIsLobbyMaster();

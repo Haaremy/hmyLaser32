@@ -17,6 +17,7 @@ void u8g2_prepare() {
 static const char *phaseLabel(uint8_t p) {
   switch (p) {
     case PHASE_LOBBY:  return "LOBBY";
+    case PHASE_DISTRIBUTING: return "START";
     case PHASE_ACTIVE: return "ACTIVE";
     case PHASE_DONE:   return "DONE";
     default:           return "IDLE";
@@ -24,8 +25,10 @@ static const char *phaseLabel(uint8_t p) {
 }
 
 static uint8_t currentPhase() {
-  if (g_phaseLastUpdate != 0 && (millis() - g_phaseLastUpdate) < PHASE_TIMEOUT_MS) return g_phase;
-  return g_standalonePhase;
+  if (g_phaseLastUpdate != 0 && (millis() - g_phaseLastUpdate) < PHASE_TIMEOUT_MS) {
+    return g_phase == PHASE_IDLE ? PHASE_ACTIVE : g_phase;
+  }
+  return PHASE_ACTIVE;
 }
 
 static const char *myTeamName() {
@@ -84,6 +87,18 @@ void updateDisplay() {
     u8g2.drawStr(48, 0, serverPhase ? g_phaseMode : "standalone");
     const char *tn = myTeamName();
     if (tn) { snprintf(line, sizeof(line), "Team: %s", tn); u8g2.drawStr(0, 18, line); }
+    else    { u8g2.drawStr(0, 18, "Warteraum"); }
+    u8g2.drawStr(0, 32, "Warte auf Start");
+    u8g2.drawStr(0, 50, identityMyName());
+    u8g2.sendBuffer();
+    return;
+  }
+
+  if (p == PHASE_DISTRIBUTING) {
+    u8g2.drawStr(0, 0, "START");
+    u8g2.drawStr(48, 0, serverPhase ? g_phaseMode : "standalone");
+    const char *tn = myTeamName();
+    if (tn) { snprintf(line, sizeof(line), "Team: %s", tn); u8g2.drawStr(0, 18, line); }
     else    { u8g2.drawStr(0, 18, "Verteilen..."); }
     long left = serverPhase
       ? (long)g_phaseSecondsLeft - (long)((millis() - g_phaseLastUpdate) / 1000UL)
@@ -114,11 +129,11 @@ void updateDisplay() {
   if (tn) {
     snprintf(line, sizeof(line), "Team: %s", tn); u8g2.drawStr(0, 14, line);
     snprintf(line, sizeof(line), "Pts: %d", myPoints); u8g2.drawStr(0, 28, line);
-    snprintf(line, sizeof(line), "H:%d I1:%d I2:%d", hitCount, hitCountPrimary, hitCountSecondary); u8g2.drawStr(0, 42, line);
+    snprintf(line, sizeof(line), "H:%d 1:%d 2:%d 3:%d", hitCount, hitCountPrimary, hitCountSecondary, hitCountTertiary); u8g2.drawStr(0, 42, line);
     snprintf(line, sizeof(line), "Rank: %d", getMyRank()); u8g2.drawStr(0, 56, line);
   } else {
     snprintf(line, sizeof(line), "Pts: %d", myPoints); u8g2.drawStr(0, 14, line);
-    snprintf(line, sizeof(line), "H:%d I1:%d I2:%d", hitCount, hitCountPrimary, hitCountSecondary); u8g2.drawStr(0, 28, line);
+    snprintf(line, sizeof(line), "H:%d 1:%d 2:%d 3:%d", hitCount, hitCountPrimary, hitCountSecondary, hitCountTertiary); u8g2.drawStr(0, 28, line);
     snprintf(line, sizeof(line), "Shots: %d", shotsFired); u8g2.drawStr(0, 42, line);
     snprintf(line, sizeof(line), "Rank: %d", getMyRank()); u8g2.drawStr(0, 56, line);
   }

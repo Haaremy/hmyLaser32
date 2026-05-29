@@ -13,7 +13,7 @@ live statistics, and match history.
 
 The repository contains:
 
-- Player firmware for ESP32 clients with IR shooting, two IR receiver zones,
+- Player firmware for ESP32 clients with IR shooting, three IR receiver zones,
   OLED display, WS2812B strip, optional NFC login, and ESP-NOW sync.
 - Server firmware for an ESP32 bridge with permanent AP + captive portal,
   WLAN setup, local game administration, ESP-NOW orchestration, and HTTPS
@@ -76,7 +76,7 @@ The local portal now has two tabs:
 - `Spiel`: operational match control.
   - `Warteraum starten`
   - distribution time and match duration in seconds
-  - points per hit
+  - points per zone: Zone1 chest, Zone2 shoulders, Zone3 back/weapon
   - match mode dropdown: `Alle gegen Alle` or `Team-Modus`
   - known player table with color, device ID, name, and team
   - `Aktualisieren` syncs player color/team assignments to clients
@@ -115,8 +115,9 @@ identity, and local match defaults.
 
 ## Game Rules
 
-- A valid hit gives the shooter `hitPoints` points, default `10`.
-- `hitPoints` can be changed in the ESP local portal and in the web settings.
+- A valid hit gives the shooter the configured zone points:
+  Zone1/chest `15`, Zone2/shoulders `10`, Zone3/back or weapon `5`.
+- Zone points can be changed in the ESP local portal and in the web settings.
 - `Shots` is the number of trigger pulls sent by a client.
 - `RX Hits` is the number of hits received by a client.
 - Team-mode friendly fire is ignored.
@@ -160,7 +161,8 @@ npx prisma db push
 npm run dev
 ```
 
-The current schema includes `EspServer.hitPoints`. Existing databases must be
+The current schema includes `EspServer.zone1Points`, `zone2Points`, and
+`zone3Points`. Existing databases must be
 migrated or pushed before the updated app can use the field.
 
 ## Firmware Quick Start

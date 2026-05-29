@@ -18,6 +18,9 @@ type Props = {
   mode: string;
   lobbySeconds: number;
   matchSeconds: number;
+  zone1Points: number;
+  zone2Points: number;
+  zone3Points: number;
   teams: TeamDef[];
   knownPlayers: KnownPlayer[];
   startRequested: boolean;
@@ -54,6 +57,9 @@ export function EspDetail(p: Props) {
               mode: msg.mode,
               lobbySeconds: msg.lobbySeconds,
               matchSeconds: msg.matchSeconds,
+              zone1Points: msg.zone1Points ?? prev.zone1Points,
+              zone2Points: msg.zone2Points ?? prev.zone2Points,
+              zone3Points: msg.zone3Points ?? prev.zone3Points,
               teams: msg.teams || [],
               knownPlayers: msg.knownPlayers || [],
               startRequested: msg.startRequested
@@ -179,6 +185,9 @@ function Settings({ p, ws }: { p: Props; ws: React.MutableRefObject<WebSocket | 
   const [mode, setMode] = useState<Mode>((p.mode === 'team' ? 'team' : 'free-for-all'));
   const [starttimer, setStarttimer] = useState(p.lobbySeconds);
   const [duration, setDuration] = useState(p.matchSeconds);
+  const [zone1, setZone1] = useState(p.zone1Points);
+  const [zone2, setZone2] = useState(p.zone2Points);
+  const [zone3, setZone3] = useState(p.zone3Points);
 
   const [teams, setTeams] = useState<TeamDef[]>(
     p.teams.length > 0
@@ -196,8 +205,11 @@ function Settings({ p, ws }: { p: Props; ws: React.MutableRefObject<WebSocket | 
     setMode((p.mode === 'team' ? 'team' : 'free-for-all'));
     setStarttimer(p.lobbySeconds);
     setDuration(p.matchSeconds);
+    setZone1(p.zone1Points);
+    setZone2(p.zone2Points);
+    setZone3(p.zone3Points);
     if (p.teams.length > 0) setTeams(p.teams);
-  }, [p.mode, p.lobbySeconds, p.matchSeconds, p.teams]);
+  }, [p.mode, p.lobbySeconds, p.matchSeconds, p.zone1Points, p.zone2Points, p.zone3Points, p.teams]);
 
   const allCommands = useMemo(() => {
     const set = new Set<number>();
@@ -223,7 +235,7 @@ function Settings({ p, ws }: { p: Props; ws: React.MutableRefObject<WebSocket | 
     setTeams(teams.map((t) => ({ ...t, members: t.members.filter((m) => m !== cmd) })));
   }
   function addTeam() {
-    if (teams.length >= 4) return;
+    if (teams.length >= 10) return;
     setTeams([...teams, { name: `Team ${teams.length + 1}`, color: DEFAULT_COLORS[teams.length] || '#64748b', members: [] }]);
   }
   function removeTeam(idx: number) {
@@ -258,6 +270,9 @@ function Settings({ p, ws }: { p: Props; ws: React.MutableRefObject<WebSocket | 
       mode,
       lobbySeconds: starttimer,
       matchSeconds: duration,
+      zone1Points: zone1,
+      zone2Points: zone2,
+      zone3Points: zone3,
       teams: mode === 'team' ? teams : []
     };
 
@@ -333,10 +348,22 @@ function Settings({ p, ws }: { p: Props; ws: React.MutableRefObject<WebSocket | 
               <label className="hmy-field__label">Runden-Dauer (Sekunden)</label>
               <input className="hmy-input" type="number" min={30} max={3600} value={duration} onChange={(e) => setDuration(Number(e.target.value))} />
             </div>
+            <div className="hmy-field">
+              <label className="hmy-field__label">Punkte Zone1 (Brust)</label>
+              <input className="hmy-input" type="number" min={1} max={100} value={zone1} onChange={(e) => setZone1(Number(e.target.value))} />
+            </div>
+            <div className="hmy-field">
+              <label className="hmy-field__label">Punkte Zone2 (Schultern)</label>
+              <input className="hmy-input" type="number" min={1} max={100} value={zone2} onChange={(e) => setZone2(Number(e.target.value))} />
+            </div>
+            <div className="hmy-field">
+              <label className="hmy-field__label">Punkte Zone3 (Ruecken/Waffe)</label>
+              <input className="hmy-input" type="number" min={1} max={100} value={zone3} onChange={(e) => setZone3(Number(e.target.value))} />
+            </div>
 
             {mode === 'team' && (
               <fieldset style={{ border: '1px solid var(--hmy-color-border-default)', borderRadius: 'var(--hmy-radius-base)', padding: 'var(--hmy-spacing-3)', margin: 'var(--hmy-spacing-4) 0' }}>
-                <legend style={{ padding: '0 0.5rem', fontWeight: 600 }}>Teams ({teams.length} / 4)</legend>
+                <legend style={{ padding: '0 0.5rem', fontWeight: 600 }}>Teams ({teams.length} / 10)</legend>
                 {teams.map((t, i) => (
                   <div key={i} style={{ display: 'grid', gridTemplateColumns: '36px 1fr auto', gap: 'var(--hmy-spacing-3)', alignItems: 'center', marginBottom: 'var(--hmy-spacing-3)' }}>
                     <input
@@ -364,7 +391,7 @@ function Settings({ p, ws }: { p: Props; ws: React.MutableRefObject<WebSocket | 
                     </button>
                   </div>
                 ))}
-                <button type="button" className="hmy-btn hmy-btn--sm" onClick={addTeam} disabled={teams.length >= 4}>
+                <button type="button" className="hmy-btn hmy-btn--sm" onClick={addTeam} disabled={teams.length >= 10}>
                   + Team hinzufügen
                 </button>
 

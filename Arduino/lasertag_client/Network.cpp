@@ -47,7 +47,14 @@ static void handlePhase(const Message &m) {
   g_phase = newPhase;
   g_phaseSecondsLeft = (uint32_t)(m.entries[0].points < 0 ? 0 : m.entries[0].points);
   if (m.playerCount > 1 && m.entries[1].points > 0) {
-    g_hitPoints = m.entries[1].points;
+    g_zonePoints[0] = m.entries[1].points;
+    g_hitPoints = g_zonePoints[0];
+  }
+  if (m.playerCount > 2 && m.entries[2].points > 0) {
+    g_zonePoints[1] = m.entries[2].points;
+  }
+  if (m.playerCount > 3 && m.entries[3].points > 0) {
+    g_zonePoints[2] = m.entries[3].points;
   }
   g_phaseLastUpdate = millis();
   strlcpy(g_phaseMode, m.entries[0].player, sizeof(g_phaseMode));
@@ -55,6 +62,7 @@ static void handlePhase(const Message &m) {
     if (newPhase == PHASE_LOBBY) {
       resetRuntimeStatsForNewMatch();
       memset(ranking, 0, sizeof(ranking));
+      playerDisabledUntil = 0;
     }
     applyTeamColor();
     updateDisplay();

@@ -32,8 +32,10 @@ U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 IRsend irsend(IR_SEND_PIN);
 IRrecv irrecv(IR_RECV_PIN);
 IRrecv irrecvSecondary(IR_RECV_PIN_SECONDARY);
+IRrecv irrecvTertiary(IR_RECV_PIN_TERTIARY);
 decode_results results;
 decode_results resultsSecondary;
+decode_results resultsTertiary;
 
 bool lastButtonState = HIGH;
 bool lastRawButtonReading = HIGH;
@@ -43,6 +45,7 @@ unsigned long lastDisplayRefreshAt = 0;
 int hitCount = 0;
 int hitCountPrimary = 0;
 int hitCountSecondary = 0;
+int hitCountTertiary = 0;
 int shotsFired = 0;
 int myPoints = 0;
 unsigned long lastShotAt = 0;
@@ -84,6 +87,7 @@ uint32_t g_phaseSecondsLeft = 0;
 unsigned long g_phaseLastUpdate = 0;
 char g_phaseMode[16] = "free-for-all";
 int16_t g_hitPoints = DEFAULT_HIT_POINTS;
+int16_t g_zonePoints[3] = { DEFAULT_ZONE1_POINTS, DEFAULT_ZONE2_POINTS, DEFAULT_ZONE3_POINTS };
 
 // Teams (v3)
 TeamDef g_teams[MAX_TEAMS] = {};
@@ -119,6 +123,7 @@ void setup() {
   irsend.begin();
   irrecv.enableIRIn();
   irrecvSecondary.enableIRIn();
+  irrecvTertiary.enableIRIn();
 
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
@@ -152,7 +157,6 @@ void loop() {
   static bool wasPlayerDisabled = false;
   static unsigned long lastLobbyTick = 0;
   static unsigned long lastStandaloneTick = 0;
-  static unsigned long lastStandaloneBroadcast = 0;
   static const unsigned long bootAtMs = millis();
 
   identityLoop();
@@ -184,21 +188,15 @@ void loop() {
     queueTableBroadcast();
     lastPeriodicBroadcast = millis();
   }
-  if (g_phase == PHASE_LOBBY && millis() - lastLobbyTick > 1000) {
+  if ((g_phase == PHASE_LOBBY || g_phase == PHASE_DISTRIBUTING) && millis() - lastLobbyTick > 1000) {
     lastLobbyTick = millis();
     updateDisplay();
   }
   if (millis() - lastStandaloneTick > 1000) {
     lastStandaloneTick = millis();
     standaloneStateTick(peerCount + 1);
-    if (g_standalonePhase == PHASE_LOBBY || g_standalonePhase == PHASE_ACTIVE) {
+    if (g_standalonePhase == PHASE_ACTIVE) {
       updateDisplay();
     }
-  }
-
-  // v4.1 — Master broadcastet jede Sekunde den Standalone-State
-  if (millis() - lastStandaloneBroadcast > STANDALONE_BROADCAST_MS) {
-    lastStandaloneBroadcast = millis();
-    broadcastStandaloneState();
   }
 }

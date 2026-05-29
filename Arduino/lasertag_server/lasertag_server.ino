@@ -49,6 +49,7 @@ MatchSettings g_settings = {
   .lobbySeconds = DEFAULT_LOBBY_SECONDS,
   .matchSeconds = DEFAULT_MATCH_SECONDS,
   .hitPoints = DEFAULT_HIT_POINTS,
+  .zonePoints = { DEFAULT_ZONE1_POINTS, DEFAULT_ZONE2_POINTS, DEFAULT_ZONE3_POINTS },
   .teamCount = 0,
   .teams = {}
 };

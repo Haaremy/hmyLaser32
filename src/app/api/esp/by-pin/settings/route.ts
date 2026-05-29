@@ -17,6 +17,7 @@ export async function GET(req: Request) {
     where: { pin },
     select: {
       id: true, mode: true, lobbySeconds: true, matchSeconds: true, hitPoints: true,
+      zone1Points: true, zone2Points: true, zone3Points: true,
       teams: true, startRequested: true
     }
   });
@@ -39,6 +40,9 @@ export async function GET(req: Request) {
     lobbySeconds: server.lobbySeconds,
     matchSeconds: server.matchSeconds,
     hitPoints: server.hitPoints,
+    zone1Points: server.zone1Points,
+    zone2Points: server.zone2Points,
+    zone3Points: server.zone3Points,
     teams: parseTeams(server.teams),
     startRequested: server.startRequested
   });

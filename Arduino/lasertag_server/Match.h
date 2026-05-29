@@ -7,6 +7,7 @@
 void matchLoadSettings();
 void matchSaveSettings();
 bool matchStart();
+bool matchActivate();
 bool matchEnd();
 bool matchAbort();
 void matchLoop();

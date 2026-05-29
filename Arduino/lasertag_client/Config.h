@@ -33,6 +33,7 @@
 constexpr uint16_t IR_SEND_PIN = 4;
 constexpr uint16_t IR_RECV_PIN = 13;
 constexpr uint16_t IR_RECV_PIN_SECONDARY = 26;
+constexpr uint16_t IR_RECV_PIN_TERTIARY = 25;
 
 // Button
 //   Default GPIO 32 (NFC-kompatibel — GPIO 19 wäre dort MISO blockiert).
@@ -80,8 +81,9 @@ constexpr uint8_t MSG_HIT_EVENT     = 8;
 // Match-Phasen
 constexpr uint8_t PHASE_IDLE   = 0;
 constexpr uint8_t PHASE_LOBBY  = 1;
-constexpr uint8_t PHASE_ACTIVE = 2;
-constexpr uint8_t PHASE_DONE   = 3;
+constexpr uint8_t PHASE_DISTRIBUTING = 2;
+constexpr uint8_t PHASE_ACTIVE = 3;
+constexpr uint8_t PHASE_DONE   = 4;
 
 // Timing
 constexpr unsigned long DEBOUNCE_MS = 50;
@@ -90,7 +92,10 @@ constexpr unsigned long HIT_DISABLE_MS = 5000;
 constexpr unsigned long PHASE_TIMEOUT_MS = 5000;
 constexpr unsigned long TEAMS_TIMEOUT_MS = 8000;
 constexpr unsigned long HIT_BLINK_INTERVAL_MS = 120;
-constexpr int DEFAULT_HIT_POINTS = 10;
+constexpr int DEFAULT_ZONE1_POINTS = 15;  // Brust
+constexpr int DEFAULT_ZONE2_POINTS = 10;  // Schultern
+constexpr int DEFAULT_ZONE3_POINTS = 5;   // Ruecken / Waffe
+constexpr int DEFAULT_HIT_POINTS = DEFAULT_ZONE1_POINTS;
 
 // Identity-Aushandlung
 constexpr unsigned long IDENTITY_WAIT_MS           = 5000;

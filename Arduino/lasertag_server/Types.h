@@ -62,8 +62,9 @@ struct PlayerSnapshot {
 enum MatchPhase : uint8_t {
   MATCH_IDLE   = 0,
   MATCH_LOBBY  = 1,
-  MATCH_ACTIVE = 2,
-  MATCH_DONE   = 3
+  MATCH_DISTRIBUTING = 2,
+  MATCH_ACTIVE = 3,
+  MATCH_DONE   = 4
 };
 
 struct TeamDef {
@@ -77,6 +78,7 @@ struct MatchSettings {
   uint32_t lobbySeconds;
   uint32_t matchSeconds;
   int16_t  hitPoints;
+  int16_t  zonePoints[3];
   uint8_t  teamCount;
   TeamDef  teams[MAX_TEAMS];
 };

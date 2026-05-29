@@ -10,6 +10,9 @@ const schema = z.object({
   mode: z.string().min(1).max(32).optional(),
   durationSeconds: z.number().int().positive().max(86400).optional(),
   hitPoints: z.number().int().positive().max(100).optional(),
+  zone1Points: z.number().int().positive().max(100).optional(),
+  zone2Points: z.number().int().positive().max(100).optional(),
+  zone3Points: z.number().int().positive().max(100).optional(),
   teams: z
     .array(z.object({ name: z.string().min(1).max(32), color: z.string().min(1).max(16) }))
     .max(10)
@@ -34,7 +37,12 @@ export async function POST(req: Request) {
       durationSeconds: body.durationSeconds ?? null,
       mode: body.mode ?? null,
       status: 'active',
-      settings: { hitPoints: body.hitPoints ?? 10 },
+      settings: {
+        hitPoints: body.zone1Points ?? body.hitPoints ?? 15,
+        zone1Points: body.zone1Points ?? body.hitPoints ?? 15,
+        zone2Points: body.zone2Points ?? 10,
+        zone3Points: body.zone3Points ?? 5
+      },
       teams: body.teams ? { create: body.teams.map((t) => ({ name: t.name, color: t.color })) } : undefined
     },
     include: { teams: true }

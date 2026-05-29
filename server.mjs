@@ -193,6 +193,7 @@ async function buildEspSnapshot(espId) {
     select: {
       id: true, name: true, online: true, lastSeen: true,
       mode: true, lobbySeconds: true, matchSeconds: true,
+      zone1Points: true, zone2Points: true, zone3Points: true,
       teams: true, knownPlayers: true, startRequested: true
     }
   });
@@ -206,6 +207,9 @@ async function buildEspSnapshot(espId) {
     mode: server.mode,
     lobbySeconds: server.lobbySeconds,
     matchSeconds: server.matchSeconds,
+    zone1Points: server.zone1Points,
+    zone2Points: server.zone2Points,
+    zone3Points: server.zone3Points,
     teams: server.teams || [],
     knownPlayers: server.knownPlayers || [],
     startRequested: server.startRequested
@@ -225,7 +229,7 @@ espWss.on('connection', async (ws, info) => {
 
     if (msg.action === 'updateSettings') {
       // PIN-gated settings edit via WS
-      const { pin, mode, lobbySeconds, matchSeconds, teams } = msg;
+      const { pin, mode, lobbySeconds, matchSeconds, zone1Points, zone2Points, zone3Points, teams } = msg;
       const s = await prisma.espServer.findUnique({ where: { id: espId } });
       if (!s || s.pin !== String(pin || '')) {
         ws.send(JSON.stringify({ type: 'error', action: 'updateSettings', error: 'invalid_pin' }));
@@ -237,6 +241,10 @@ espWss.on('connection', async (ws, info) => {
           mode: mode ?? s.mode,
           lobbySeconds: lobbySeconds ?? s.lobbySeconds,
           matchSeconds: matchSeconds ?? s.matchSeconds,
+          hitPoints: zone1Points ?? s.hitPoints,
+          zone1Points: zone1Points ?? s.zone1Points,
+          zone2Points: zone2Points ?? s.zone2Points,
+          zone3Points: zone3Points ?? s.zone3Points,
           ...(teams !== undefined ? { teams } : {})
         }
       });

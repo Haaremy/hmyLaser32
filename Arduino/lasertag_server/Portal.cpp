@@ -20,6 +20,7 @@ static void redirectToRoot() {
 static const char *phaseName(MatchPhase p) {
   switch (p) {
     case MATCH_LOBBY:  return "LOBBY";
+    case MATCH_DISTRIBUTING: return "DISTRIBUTING";
     case MATCH_ACTIVE: return "ACTIVE";
     case MATCH_DONE:   return "DONE";
     default:           return "IDLE";
@@ -100,7 +101,7 @@ static void handleRoot() {
             "button{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:700;cursor:pointer;margin-top:.6rem}button:hover{background:#1d4ed8}.warn{background:#d97706;border-color:#d97706}"
             ".pin{font-family:monospace;font-size:1.4rem;letter-spacing:.3em;background:#111827;padding:.4rem .8rem;border-radius:.4rem;display:inline-block}.net{display:flex;align-items:center;gap:.6rem;padding:.4rem 0;border-bottom:1px dashed #374151;cursor:pointer}.net:hover{color:#38bdf8}.rssi{font-family:monospace;font-size:.75rem;color:#9ca3af;margin-left:auto}.lock{font-size:.7rem;color:#64748b}"
             ".pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.7rem;font-weight:700;text-transform:uppercase}.kv{display:grid;grid-template-columns:150px 1fr;gap:.4rem;margin:.3rem 0;font-size:.85rem}.kv .k{color:#9ca3af}.kv .v{font-family:monospace;color:#f9fafb;word-break:break-all}small{color:#9ca3af}"
-            ".row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem}@media(max-width:760px){.row{grid-template-columns:1fr}}"
+            ".row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem}@media(max-width:760px){.row{grid-template-columns:1fr}}"
             "table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{border-bottom:1px solid #374151;padding:.5rem;text-align:left}th{color:#9ca3af}td.num{text-align:right;font-family:monospace}.sw{width:3rem;padding:.2rem}tr.live{transition:background .2s}"
             "</style></head><body><main><h1>hmyLaser32 Server</h1>"
             "<div class='tabs'><button class='tab active' onclick=\"tab('game',this)\" type='button'>Spiel</button><button class='tab' onclick=\"tab('settings',this)\" type='button'>Einstellungen</button></div>");
@@ -119,12 +120,16 @@ static void handleRoot() {
   html += String((unsigned long)g_settings.lobbySeconds);
   html += F("'></div><div><label>Match-Dauer (Sek.)</label><input name='match' type='number' min='30' max='3600' value='");
   html += String((unsigned long)g_settings.matchSeconds);
-  html += F("'></div><div><label>Punkte pro Treffer</label><input name='hitpts' type='number' min='1' max='100' value='");
-  html += String((int)g_settings.hitPoints);
   html += F("'></div><div><label>Match Modus</label><select name='mode'>");
   html += String("<option value='free-for-all'") + (strcmp(g_settings.mode, "free-for-all") == 0 ? " selected" : "") + ">Alle gegen Alle</option>";
   html += String("<option value='team'") + (strcmp(g_settings.mode, "team") == 0 ? " selected" : "") + ">Team-Modus</option>";
-  html += F("</select></div></div><button type='submit'>Einstellungen speichern</button></form></div>");
+  html += F("</select></div><div><label>Punkte Zone1 (Brust)</label><input name='zone1' type='number' min='1' max='100' value='");
+  html += String((int)g_settings.zonePoints[0]);
+  html += F("'></div><div><label>Punkte Zone2 (Schultern)</label><input name='zone2' type='number' min='1' max='100' value='");
+  html += String((int)g_settings.zonePoints[1]);
+  html += F("'></div><div><label>Punkte Zone3 (Ruecken/Waffe)</label><input name='zone3' type='number' min='1' max='100' value='");
+  html += String((int)g_settings.zonePoints[2]);
+  html += F("'></div></div><button type='submit'>Einstellungen speichern</button></form></div>");
 
   html += F("<div class='card'><h2>Bekannte Spieler</h2><form method='POST' action='/api/players'><table><thead><tr><th>Farbe</th><th>ID</th><th>Name</th><th>Team</th></tr></thead><tbody>");
   int visible = 0;
@@ -149,6 +154,8 @@ static void handleRoot() {
 
   if (g_matchPhase == MATCH_LOBBY) {
     html += F("<div class='card'><form method='POST' action='/api/match/activate'><button type='submit'>Match starten</button></form></div>");
+  } else if (g_matchPhase == MATCH_DISTRIBUTING) {
+    html += F("<div class='card'><strong>Verteilzeit laeuft.</strong></div>");
   }
   html += F("<div class='card'><h2>Live Statistik</h2><table><thead><tr><th>Rank</th><th>Spieler</th><th>Shots</th><th>RX Hits</th><th>Punkte</th></tr></thead><tbody id='livebody'></tbody></table></div></section>");
 
@@ -207,6 +214,9 @@ static void handleSettingsGet() {
   j += "\",\"lobbySeconds\":"; j += String((unsigned long)g_settings.lobbySeconds);
   j += ",\"matchSeconds\":"; j += String((unsigned long)g_settings.matchSeconds);
   j += ",\"hitPoints\":"; j += String((int)g_settings.hitPoints);
+  j += ",\"zone1Points\":"; j += String((int)g_settings.zonePoints[0]);
+  j += ",\"zone2Points\":"; j += String((int)g_settings.zonePoints[1]);
+  j += ",\"zone3Points\":"; j += String((int)g_settings.zonePoints[2]);
   j += ",\"wifiConnected\":"; j += (g_wifiConnected ? "true" : "false");
   j += ",\"portalRegistered\":"; j += (g_portalRegistered ? "true" : "false");
   j += ",\"matchPhase\":\""; j += phaseName(g_matchPhase); j += "\"";
@@ -239,8 +249,13 @@ static void handleSettingsPost() {
   if (server.hasArg("mode")) strlcpy(g_settings.mode, server.arg("mode").c_str(), sizeof(g_settings.mode));
   if (server.hasArg("lobby")) g_settings.lobbySeconds = (uint32_t)server.arg("lobby").toInt();
   if (server.hasArg("match")) g_settings.matchSeconds = (uint32_t)server.arg("match").toInt();
-  if (server.hasArg("hitpts")) g_settings.hitPoints = (int16_t)server.arg("hitpts").toInt();
-  if (g_settings.hitPoints <= 0) g_settings.hitPoints = DEFAULT_HIT_POINTS;
+  if (server.hasArg("zone1")) g_settings.zonePoints[0] = (int16_t)server.arg("zone1").toInt();
+  if (server.hasArg("zone2")) g_settings.zonePoints[1] = (int16_t)server.arg("zone2").toInt();
+  if (server.hasArg("zone3")) g_settings.zonePoints[2] = (int16_t)server.arg("zone3").toInt();
+  if (g_settings.zonePoints[0] <= 0) g_settings.zonePoints[0] = DEFAULT_ZONE1_POINTS;
+  if (g_settings.zonePoints[1] <= 0) g_settings.zonePoints[1] = DEFAULT_ZONE2_POINTS;
+  if (g_settings.zonePoints[2] <= 0) g_settings.zonePoints[2] = DEFAULT_ZONE3_POINTS;
+  g_settings.hitPoints = g_settings.zonePoints[0];
   rebuildTeamsFromSnapshots();
   matchSaveSettings();
   espNowBroadcastTeams();
@@ -281,8 +296,9 @@ static void handleMatchStart() {
 }
 
 static void handleMatchActivate() {
-  if (g_matchPhase == MATCH_LOBBY) {
-    g_lobbyEndsAtMs = millis();
+  if (!matchActivate()) {
+    server.send(409, "text/plain", "not in waiting room");
+    return;
   }
   redirectToRoot();
 }

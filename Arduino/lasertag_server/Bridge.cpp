@@ -208,6 +208,9 @@ bool bridgePullSettings(bool &out_startRequested) {
   long match = jsonNumberField(resp, "matchSeconds", -1);
   bool startReq = jsonBoolField(resp, "startRequested", false);
   long hitPoints = jsonNumberField(resp, "hitPoints", -1);
+  long zone1Points = jsonNumberField(resp, "zone1Points", -1);
+  long zone2Points = jsonNumberField(resp, "zone2Points", -1);
+  long zone3Points = jsonNumberField(resp, "zone3Points", -1);
 
   bool changed = false;
   if (mode.length() > 0 && mode != String(g_settings.mode)) {
@@ -217,6 +220,10 @@ bool bridgePullSettings(bool &out_startRequested) {
   if (lobby > 0 && (uint32_t)lobby != g_settings.lobbySeconds) { g_settings.lobbySeconds = (uint32_t)lobby; changed = true; }
   if (match > 0 && (uint32_t)match != g_settings.matchSeconds) { g_settings.matchSeconds = (uint32_t)match; changed = true; }
   if (hitPoints > 0 && (int16_t)hitPoints != g_settings.hitPoints) { g_settings.hitPoints = (int16_t)hitPoints; changed = true; }
+  if (zone1Points > 0 && (int16_t)zone1Points != g_settings.zonePoints[0]) { g_settings.zonePoints[0] = (int16_t)zone1Points; changed = true; }
+  if (zone2Points > 0 && (int16_t)zone2Points != g_settings.zonePoints[1]) { g_settings.zonePoints[1] = (int16_t)zone2Points; changed = true; }
+  if (zone3Points > 0 && (int16_t)zone3Points != g_settings.zonePoints[2]) { g_settings.zonePoints[2] = (int16_t)zone3Points; changed = true; }
+  g_settings.hitPoints = g_settings.zonePoints[0];
 
   // Teams parsen — wir überschreiben immer, weil das JSON die Source of Truth ist
   TeamDef newTeams[MAX_TEAMS] = {};
@@ -242,7 +249,13 @@ bool bridgeStartMatch() {
   body += "\",\"durationSeconds\":";
   body += String((unsigned long)g_settings.matchSeconds);
   body += ",\"hitPoints\":";
-  body += String((int)g_settings.hitPoints);
+  body += String((int)g_settings.zonePoints[0]);
+  body += ",\"zone1Points\":";
+  body += String((int)g_settings.zonePoints[0]);
+  body += ",\"zone2Points\":";
+  body += String((int)g_settings.zonePoints[1]);
+  body += ",\"zone3Points\":";
+  body += String((int)g_settings.zonePoints[2]);
 
   if (g_settings.teamCount > 0) {
     body += ",\"teams\":[";

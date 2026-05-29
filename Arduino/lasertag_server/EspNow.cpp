@@ -139,7 +139,6 @@ static void handleHitEvent(const Message &m) {
   PlayerSnapshot *shooter = ensureSnapshot(m.entries[0].playerId, m.entries[0].player);
   PlayerSnapshot *target = ensureSnapshot(m.entries[1].playerId, m.entries[1].player);
   if (!shooter || !target) return;
-  if (m.entries[0].lastUpdate <= shooter->lastUpdate) return;
   shooter->lastPoints += m.entries[0].points;
   shooter->lastUpdate = m.entries[0].lastUpdate;
   target->rxHits = (uint16_t)(m.entries[1].points < 0 ? 0 : m.entries[1].points);
@@ -191,7 +190,7 @@ void espNowBroadcastPhase() {
   m.playerCount = 1;
   m.entries[0].playerId = (uint32_t)g_matchPhase;
   uint32_t secsLeft = 0;
-  if (g_matchPhase == MATCH_LOBBY) {
+  if (g_matchPhase == MATCH_DISTRIBUTING) {
     long left = (long)(g_lobbyEndsAtMs - millis()) / 1000L;
     secsLeft = left > 0 ? (uint32_t)left : 0;
   } else if (g_matchPhase == MATCH_ACTIVE) {
@@ -201,8 +200,10 @@ void espNowBroadcastPhase() {
   m.entries[0].points = (int16_t)(secsLeft > 32767 ? 32767 : secsLeft);
   strlcpy(m.entries[0].player, g_settings.mode, sizeof(m.entries[0].player));
   m.entries[0].lastUpdate = millis();
-  m.playerCount = 2;
-  m.entries[1].points = g_settings.hitPoints;
+  m.playerCount = 4;
+  m.entries[1].points = g_settings.zonePoints[0];
+  m.entries[2].points = g_settings.zonePoints[1];
+  m.entries[3].points = g_settings.zonePoints[2];
   esp_now_send(kBroadcast, reinterpret_cast<const uint8_t *>(&m), sizeof(m));
 }
 

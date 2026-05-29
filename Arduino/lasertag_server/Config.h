@@ -38,7 +38,10 @@ constexpr char MDNS_PREFIX[]      = "hmylaser32";
 // --- Match-Defaults --------------------------------------------------------
 constexpr unsigned long DEFAULT_LOBBY_SECONDS    = 60;    // Starttimer
 constexpr unsigned long DEFAULT_MATCH_SECONDS    = 300;   // Runden-Dauer
-constexpr int           DEFAULT_HIT_POINTS       = 10;
+constexpr int           DEFAULT_ZONE1_POINTS     = 15;    // Brust
+constexpr int           DEFAULT_ZONE2_POINTS     = 10;    // Schultern
+constexpr int           DEFAULT_ZONE3_POINTS     = 5;     // Ruecken / Waffe
+constexpr int           DEFAULT_HIT_POINTS       = DEFAULT_ZONE1_POINTS;
 constexpr char          DEFAULT_MATCH_MODE[]     = "free-for-all";
 
 // --- Periodische Tasks -----------------------------------------------------

@@ -29,6 +29,9 @@ export default async function EspDetailPage({ params }: { params: { id: string }
       mode={server.mode}
       lobbySeconds={server.lobbySeconds}
       matchSeconds={server.matchSeconds}
+      zone1Points={server.zone1Points}
+      zone2Points={server.zone2Points}
+      zone3Points={server.zone3Points}
       teams={parseTeams(server.teams)}
       knownPlayers={parseKnownPlayers(server.knownPlayers)}
       startRequested={server.startRequested}

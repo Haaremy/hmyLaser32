@@ -13,8 +13,10 @@ extern U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2;
 extern IRsend irsend;
 extern IRrecv irrecv;
 extern IRrecv irrecvSecondary;
+extern IRrecv irrecvTertiary;
 extern decode_results results;
 extern decode_results resultsSecondary;
+extern decode_results resultsTertiary;
 
 extern bool lastButtonState;
 extern bool lastRawButtonReading;
@@ -24,6 +26,7 @@ extern unsigned long lastDisplayRefreshAt;
 extern int hitCount;
 extern int hitCountPrimary;
 extern int hitCountSecondary;
+extern int hitCountTertiary;
 extern int shotsFired;
 extern int myPoints;
 extern unsigned long lastShotAt;
@@ -44,6 +47,7 @@ extern uint32_t g_phaseSecondsLeft;
 extern unsigned long g_phaseLastUpdate;
 extern char     g_phaseMode[16];
 extern int16_t  g_hitPoints;
+extern int16_t  g_zonePoints[3];
 
 // --- Teams (v3) -----------------------------------------------------------
 extern TeamDef  g_teams[MAX_TEAMS];

@@ -20,7 +20,8 @@ Arduino IDE 2.x or PlatformIO.
 | ESP32 NodeMCU-32S | main controller |
 | KY-005 IR emitter | trigger output, NEC encoded |
 | TSOP38238 IR receiver | primary hit zone |
-| Second TSOP38238 | optional second hit zone, currently supported in code |
+| Second TSOP38238 | zone 2, shoulders |
+| Third TSOP38238 | zone 3, back or weapon |
 | SSD1306 128x64 OLED | status display |
 | WS2812B strip | player/team color and hit feedback |
 | Momentary button | trigger, default GPIO 32 |
@@ -45,6 +46,7 @@ Defined in `lasertag_client/Config.h`.
 | IR send | 4 |
 | IR receive zone 1 | 13 |
 | IR receive zone 2 | 26 |
+| IR receive zone 3 | 25 |
 | Trigger button | 32 |
 | OLED SDA | 21 |
 | OLED SCL | 22 |
@@ -130,8 +132,8 @@ to the server with `MSG_PLAYER_STATE`.
 ### Scoring
 
 - Shots are allowed only during `PHASE_ACTIVE`.
-- A valid hit awards `g_hitPoints` to the shooter.
-- Default hit points are `10`.
+- A valid hit awards zone-specific points to the shooter.
+- Defaults: Zone1/chest `15`, Zone2/shoulders `10`, Zone3/back or weapon `5`.
 - Team-mode friendly fire is ignored.
 - The receiving client broadcasts `MSG_HIT_EVENT` with shooter and target data.
 
@@ -146,7 +148,7 @@ Important modules:
 | `Types.h` | shared wire structs, snapshots, settings |
 | `Portal.cpp` | local captive portal UI and endpoints |
 | `EspNow.cpp` | ESP-NOW receive/send, snapshots, config broadcast |
-| `Match.cpp` | IDLE -> LOBBY -> ACTIVE -> DONE state machine |
+| `Match.cpp` | IDLE -> LOBBY -> DISTRIBUTING -> ACTIVE -> DONE state machine |
 | `Bridge.cpp` | HTTPS calls to Next.js portal |
 | `WiFiSetup.cpp` | permanent AP + STA + mDNS |
 | `Identity.cpp` | server name and PIN generation |
@@ -166,7 +168,7 @@ The portal has two tabs.
 `Spiel`:
 
 - start waiting room
-- set distribution time, match duration, hit points
+- set distribution time, match duration, and zone points
 - select mode: `Alle gegen Alle` or `Team-Modus`
 - edit known players: color, device ID, name, team
 - sync players with `Aktualisieren`
@@ -188,14 +190,20 @@ There is no early match abort route in the UI.
 IDLE
   -> Warteraum starten
 LOBBY
-  -> Match starten or lobby timer expires
+  -> waits indefinitely for manual Match starten
+DISTRIBUTING
+  -> distribution timer expires
 ACTIVE
   -> match timer expires
 DONE
 ```
 
-During `LOBBY` and `ACTIVE`, the server broadcasts phase/config/team updates.
-When the active timer expires, the server posts final stats to the web portal.
+During `LOBBY`, `DISTRIBUTING`, and `ACTIVE`, the server broadcasts
+phase/config/team updates. `LOBBY` only blocks play and displays "Warte auf
+Start"; the distribution timer starts only after `Match starten`. If no server
+phase is fresh, or if the server broadcasts `IDLE`, clients play endless
+free-play mode. When the active timer expires, the server posts final stats to
+the web portal if available.
 
 ## ESP-NOW Wire Format
 
@@ -243,7 +251,7 @@ The server forwards:
 - live hit events
 - known player snapshots with `points`, `shots`, `rxHits`, `team`, `color`,
   and optional `nfcToken`
-- pulled settings: mode, lobby seconds, match seconds, hit points, teams,
+- pulled settings: mode, lobby seconds, match seconds, zone points, teams,
   and start-request flag
 
 The ESP server stores no long-term player data. Persistent player history lives
