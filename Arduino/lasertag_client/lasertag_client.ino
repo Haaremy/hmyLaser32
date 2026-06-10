@@ -7,7 +7,7 @@
 //       + Wait-Mode, Hit-Effekt, Stand-Alone-Lobby
 //       + Friendly Fire, NFC-Logik (optional HAS_NFC)
 //   v4.1: + Master-Election + MSG_STANDALONE-Konsens
-//         + Button auf GPIO 19 (default, NFC nur als Empfehlung)
+//         + Button auf GPIO 32 (NFC-kompatibel)
 //         + Schnellere Discovery in den ersten 15s (1 s statt 5 s)
 // ============================================================================
 
@@ -45,7 +45,6 @@ unsigned long lastDisplayRefreshAt = 0;
 int hitCount = 0;
 int hitCountPrimary = 0;
 int hitCountSecondary = 0;
-int hitCountTertiary = 0;
 int shotsFired = 0;
 int myPoints = 0;
 unsigned long lastShotAt = 0;
@@ -87,7 +86,6 @@ uint32_t g_phaseSecondsLeft = 0;
 unsigned long g_phaseLastUpdate = 0;
 char g_phaseMode[16] = "free-for-all";
 int16_t g_hitPoints = DEFAULT_HIT_POINTS;
-int16_t g_zonePoints[3] = { DEFAULT_ZONE1_POINTS, DEFAULT_ZONE2_POINTS, DEFAULT_ZONE3_POINTS };
 
 // Teams (v3)
 TeamDef g_teams[MAX_TEAMS] = {};
@@ -119,11 +117,14 @@ void setup() {
   u8g2.sendBuffer();
 
   pinMode(BUTTON_PIN, INPUT_PULLUP);
+  pinMode(IR_RECV_PIN, INPUT_PULLUP);
+  pinMode(IR_RECV_PIN_SECONDARY, INPUT_PULLUP);
+  pinMode(IR_RECV_PIN_TERTIARY, INPUT_PULLUP);
   setLedNormalState();
   irsend.begin();
   irrecv.enableIRIn();
-  irrecvSecondary.enableIRIn();
-  irrecvTertiary.enableIRIn();
+  if (HAS_ZONE2_RECEIVER) irrecvSecondary.enableIRIn();
+  if (HAS_ZONE3_RECEIVER) irrecvTertiary.enableIRIn();
 
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
@@ -164,8 +165,8 @@ void loop() {
   ledTickHitBlink();
 
   const bool disabledNow = isPlayerDisabled();
-  if (!handleTrigger()) return;
-  if (!handleIrReceiver()) return;
+  handleTrigger();
+  handleIrReceiver();
 
   updateRespawnDisplayState(disabledNow, wasPlayerDisabled);
   handleSendStatusLog();
@@ -195,6 +196,7 @@ void loop() {
   if (millis() - lastStandaloneTick > 1000) {
     lastStandaloneTick = millis();
     standaloneStateTick(peerCount + 1);
+    broadcastStandaloneState();
     if (g_standalonePhase == PHASE_ACTIVE) {
       updateDisplay();
     }

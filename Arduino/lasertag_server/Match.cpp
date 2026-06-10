@@ -74,12 +74,16 @@ bool matchActivate() {
 bool matchEnd() {
   if (g_matchPhase == MATCH_IDLE) return true;
   EndPlayer pls[MAX_PLAYERS];
-  static char nfcBuf[MAX_PLAYERS][20];
+  static char nfcBuf[MAX_PLAYERS][40];
   int count = 0;
   for (int i = 0; i < MAX_PLAYERS; i++) {
     if (g_snapshots[i].player[0] == '\0') continue;
-    snprintf(nfcBuf[count], sizeof(nfcBuf[count]), "nec:%08lx",
-             (unsigned long)g_snapshots[i].playerId);
+    if (g_snapshots[i].nfcToken[0] != '\0') {
+      strlcpy(nfcBuf[count], g_snapshots[i].nfcToken, sizeof(nfcBuf[count]));
+    } else {
+      snprintf(nfcBuf[count], sizeof(nfcBuf[count]), "nec:%08lx",
+               (unsigned long)g_snapshots[i].playerId);
+    }
     pls[count].nfc    = nfcBuf[count];
     pls[count].team   = nullptr;
     pls[count].hits   = g_settings.hitPoints > 0 ? g_snapshots[i].lastPoints / g_settings.hitPoints : 0;

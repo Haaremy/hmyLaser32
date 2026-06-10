@@ -19,8 +19,8 @@
 
 // NFC-Reader (MFRC522)
 //   1 = vorhanden, NFC-Account-Binding aktiv
-//   0 = nicht vorhanden (Default, V1-Bauplan ohne NFC)
-#define HAS_NFC 0
+//   0 = nicht vorhanden
+#define HAS_NFC 1
 
 // Helligkeit des WS2812B-Streifens (0–255). Reduziert Stromverbrauch.
 #define LED_BRIGHTNESS 80
@@ -30,10 +30,12 @@
 // ──────────────────────────────────────────────────────────────────────────
 
 // IR
-constexpr uint16_t IR_SEND_PIN = 4;
+constexpr uint16_t IR_SEND_PIN = 14;
 constexpr uint16_t IR_RECV_PIN = 13;
 constexpr uint16_t IR_RECV_PIN_SECONDARY = 26;
 constexpr uint16_t IR_RECV_PIN_TERTIARY = 25;
+constexpr bool HAS_ZONE2_RECEIVER = true;
+constexpr bool HAS_ZONE3_RECEIVER = true;
 
 // Button
 //   Default GPIO 32 (NFC-kompatibel — GPIO 19 wäre dort MISO blockiert).

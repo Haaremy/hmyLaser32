@@ -286,7 +286,7 @@ void broadcastHitEvent(uint32_t shooterId, const char *shooterName, int points) 
 // v4.1 — Master broadcastet aktuelle Standalone-Phase + Restzeit
 void broadcastStandaloneState() {
   if (!identityIsLobbyMaster()) return;
-  if (g_standalonePhase != PHASE_LOBBY && g_standalonePhase != PHASE_ACTIVE) return;
+  if (g_standalonePhase == PHASE_IDLE) return;
 
   const uint8_t broadcast[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
   Message m = {};

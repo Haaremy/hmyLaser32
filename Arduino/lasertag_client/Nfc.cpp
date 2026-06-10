@@ -86,11 +86,12 @@ void nfcLoop() {
   Message m = {};
   strlcpy(m.senderName, kLastUsername, sizeof(m.senderName));
   m.msgType = MSG_NFC;
-  m.playerCount = 4;
+  m.playerCount = 5;
   m.entries[0].playerId = getMyPlayerId();
   strlcpy(m.entries[0].player, kLastUsername, sizeof(m.entries[0].player));
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 4; i++) {
     strncpy(m.entries[i + 1].player, kLastToken + (i * 11), sizeof(m.entries[i + 1].player) - 1);
+    m.entries[i + 1].player[sizeof(m.entries[i + 1].player) - 1] = '\0';
   }
   const uint8_t broadcast[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
   esp_now_send(broadcast, reinterpret_cast<const uint8_t *>(&m), sizeof(m));

@@ -58,7 +58,7 @@ static PlayerSnapshot *ensureSnapshot(uint32_t playerId, const char *name) {
     memset(&g_snapshots[idx], 0, sizeof(g_snapshots[idx]));
     g_snapshots[idx].playerId = playerId;
     g_snapshots[idx].color = defaultColorForPlayer(playerId, idx);
-    g_snapshots[idx].teamIndex = (uint8_t)idx;
+    g_snapshots[idx].teamIndex = 0;
   }
   if (name && name[0] != '\0') strlcpy(g_snapshots[idx].player, name, sizeof(g_snapshots[idx].player));
   if (g_snapshots[idx].player[0] == '\0') snprintf(g_snapshots[idx].player, sizeof(g_snapshots[idx].player), "P%02u", (unsigned)(idx + 1));

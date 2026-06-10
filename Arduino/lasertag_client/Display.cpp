@@ -28,6 +28,7 @@ static uint8_t currentPhase() {
   if (g_phaseLastUpdate != 0 && (millis() - g_phaseLastUpdate) < PHASE_TIMEOUT_MS) {
     return g_phase == PHASE_IDLE ? PHASE_ACTIVE : g_phase;
   }
+  if (g_standalonePhase != PHASE_IDLE) return g_standalonePhase;
   return PHASE_ACTIVE;
 }
 
@@ -88,7 +89,14 @@ void updateDisplay() {
     const char *tn = myTeamName();
     if (tn) { snprintf(line, sizeof(line), "Team: %s", tn); u8g2.drawStr(0, 18, line); }
     else    { u8g2.drawStr(0, 18, "Warteraum"); }
-    u8g2.drawStr(0, 32, "Warte auf Start");
+    if (serverPhase) {
+      u8g2.drawStr(0, 32, "Warte auf Start");
+    } else {
+      long left = (long)(g_standaloneLobbyEnds - millis()) / 1000L;
+      if (left < 0) left = 0;
+      snprintf(line, sizeof(line), "Start in %lds", left);
+      u8g2.drawStr(0, 32, line);
+    }
     u8g2.drawStr(0, 50, identityMyName());
     u8g2.sendBuffer();
     return;

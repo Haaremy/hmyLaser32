@@ -27,6 +27,7 @@ static uint8_t effectivePhase() {
     if (g_phase == PHASE_IDLE) return PHASE_ACTIVE;
     return g_phase;
   }
+  if (g_standalonePhase != PHASE_IDLE) return g_standalonePhase;
   return PHASE_ACTIVE;
 }
 
@@ -59,9 +60,9 @@ bool handleTrigger() {
     lastButtonState = reading;
 
     if (reading == LOW) {
-      if (isPlayerDisabled()) { updateDisplay(); return false; }
-      if (!isShootingAllowed()) { updateDisplay(); return false; }
-      if (!identityIsAssigned()) { updateDisplay(); return false; }
+      if (isPlayerDisabled()) { updateDisplay(); return true; }
+      if (!isShootingAllowed()) { updateDisplay(); return true; }
+      if (!identityIsAssigned()) { updateDisplay(); return true; }
 
       const uint32_t myPlayerId = getMyPlayerId();
       irsend.sendNEC(static_cast<uint64_t>(myPlayerId), 32);
@@ -111,7 +112,7 @@ static bool handleIrReceiverInput(IRrecv &receiver,
 
   if (decoded.decode_type != NEC || decoded.bits != 32) {
     receiver.resume();
-    return false;
+    return true;
   }
 
   const uint32_t shooterId = irsend.encodeNEC(decoded.address, decoded.command);
@@ -158,10 +159,23 @@ static bool handleIrReceiverInput(IRrecv &receiver,
 }
 
 bool handleIrReceiver() {
-  bool primaryOk = handleIrReceiverInput(irrecv, results, "ZONE1", hitCountPrimary, g_zonePoints[0]);
-  bool secondaryOk = handleIrReceiverInput(irrecvSecondary, resultsSecondary, "ZONE2", hitCountSecondary, g_zonePoints[1]);
-  bool tertiaryOk = handleIrReceiverInput(irrecvTertiary, resultsTertiary, "ZONE3", hitCountTertiary, g_zonePoints[2]);
-  return primaryOk && secondaryOk && tertiaryOk;
+  bool ok = true;
+  ok = handleIrReceiverInput(irrecv, results, "ZONE1", hitCountPrimary, g_zonePoints[0]) && ok;
+  if (HAS_ZONE2_RECEIVER) {
+    ok = handleIrReceiverInput(irrecvSecondary,
+                               resultsSecondary,
+                               "ZONE2",
+                               hitCountSecondary,
+                               g_zonePoints[1]) && ok;
+  }
+  if (HAS_ZONE3_RECEIVER) {
+    ok = handleIrReceiverInput(irrecvTertiary,
+                               resultsTertiary,
+                               "ZONE3",
+                               hitCountTertiary,
+                               g_zonePoints[2]) && ok;
+  }
+  return ok;
 }
 
 void resetRuntimeStatsForNewMatch() {
@@ -197,12 +211,6 @@ void standaloneStateTick(int peerCountIncludingSelf) {
     return;
   }
   if (!identityIsAssigned()) return;
-  (void)peerCountIncludingSelf;
-  if (g_standalonePhase != PHASE_ACTIVE) {
-    g_standalonePhase = PHASE_ACTIVE;
-    updateDisplay();
-  }
-  return;
 
   unsigned long now = millis();
   bool iAmMaster = identityIsLobbyMaster();
