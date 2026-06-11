@@ -133,6 +133,12 @@ Optional NFC cards use this payload format:
 username|uuid-token
 ```
 
+The account page displays this exact copy-ready value. A separate ESP32 +
+RFID-RC522 writer sketch is available at
+`Arduino/nfc_writer_tool/nfc_writer_tool.ino`; its captive portal writes the
+payload to Mifare Classic blocks `4, 5, 6, 8, 9` and validates the card by
+reading it back.
+
 When scanned, the client:
 
 - changes its local display name to `username`

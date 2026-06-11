@@ -67,7 +67,7 @@ Install via Arduino IDE Library Manager:
 | `IRremoteESP8266` | client | send/receive NEC IR |
 | `U8g2` | client | OLED display |
 | `FastLED` | client | WS2812B strip |
-| `MFRC522` | client | NFC reader when enabled |
+| `MFRC522` | client + writer | NFC reader/writer when enabled |
 
 Built into the ESP32 core:
 
@@ -97,6 +97,25 @@ later override it by scanning an NFC card with:
 ```text
 username|uuid-token
 ```
+
+The client reads that payload from Mifare Classic data blocks `4, 5, 6, 8, 9`.
+Use `nfc_writer_tool/nfc_writer_tool.ino` on a separate ESP32 + RC522 to write
+and validate the same block layout through a captive portal.
+
+## NFC Writer Tool
+
+Flash `nfc_writer_tool/nfc_writer_tool.ino` to an ESP32 with an RFID-RC522
+wired to VSPI (`MOSI=23`, `MISO=19`, `SCK=18`, `SS=5`, `RST=33`). The device
+starts an open AP named `hmyLaser32-NFC-XXXX` and serves the captive portal at
+`http://192.168.4.1`.
+
+Flow:
+
+1. paste the copy-ready `username|uuid-token` value from the web account page
+2. confirm the content
+3. hold a Mifare Classic card to the reader
+4. confirm writing to the detected card
+5. the writer reads the card back and validates the payload
 
 ## Client Firmware
 

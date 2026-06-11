@@ -25,35 +25,46 @@ void nfcBegin() {
 #endif
 }
 
-// Sehr simple Karten-Parser-Heuristik: lese die NDEF-Daten bzw. Block 4 als
-// ASCII; Format "username|token". Wenn keine Library vorhanden, wird hier ein
-// Stub eingesetzt — der echte Reader-Code muss je nach Karte (Mifare Classic
-// vs. NTAG vs. PN532 vs. MFRC522) angepasst werden.
+// Mifare Classic: ASCII-Daten aus mehreren Datenbloecken lesen.
+// Format: "username|token".
 static bool nfcReadCard(char *out, size_t maxLen) {
 #if HAS_NFC
   if (!mfrc522.PICC_IsNewCardPresent()) return false;
   if (!mfrc522.PICC_ReadCardSerial()) return false;
 
-  // Mifare Classic: Block 4 lesen (Default-Key A FFFFFFFFFFFF)
   MFRC522::MIFARE_Key key;
   for (uint8_t i = 0; i < 6; i++) key.keyByte[i] = 0xFF;
-  byte buffer[18];
-  byte size = sizeof(buffer);
-  uint8_t status = mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, 4, &key, &(mfrc522.uid));
-  if (status != MFRC522::STATUS_OK) {
-    mfrc522.PICC_HaltA();
-    mfrc522.PCD_StopCrypto1();
-    return false;
+
+  size_t pos = 0;
+  bool ok = true;
+  for (size_t i = 0; i < NFC_DATA_BLOCK_COUNT && pos < maxLen - 1; i++) {
+    byte block = NFC_DATA_BLOCKS[i];
+    byte buffer[18] = {};
+    byte size = sizeof(buffer);
+    MFRC522::StatusCode status = mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, block, &key, &(mfrc522.uid));
+    if (status != MFRC522::STATUS_OK) {
+      ok = false;
+      break;
+    }
+    status = mfrc522.MIFARE_Read(block, buffer, &size);
+    if (status != MFRC522::STATUS_OK) {
+      ok = false;
+      break;
+    }
+    for (byte j = 0; j < 16 && pos < maxLen - 1; j++) {
+      if (buffer[j] == 0) {
+        out[pos] = '\0';
+        mfrc522.PICC_HaltA();
+        mfrc522.PCD_StopCrypto1();
+        return pos > 0;
+      }
+      out[pos++] = (char)buffer[j];
+    }
   }
-  status = mfrc522.MIFARE_Read(4, buffer, &size);
   mfrc522.PICC_HaltA();
   mfrc522.PCD_StopCrypto1();
-  if (status != MFRC522::STATUS_OK) return false;
-
-  size_t copyLen = (size < maxLen - 1) ? size : (maxLen - 1);
-  memcpy(out, buffer, copyLen);
-  out[copyLen] = '\0';
-  return true;
+  out[pos] = '\0';
+  return ok && pos > 0;
 #else
   (void)out; (void)maxLen;
   return false;
@@ -66,7 +77,7 @@ void nfcLoop() {
   if (millis() - lastScan < 500) return;
   lastScan = millis();
 
-  char raw[64] = {};
+  char raw[96] = {};
   if (!nfcReadCard(raw, sizeof(raw))) return;
 
   // Parse "<username>|<token>"

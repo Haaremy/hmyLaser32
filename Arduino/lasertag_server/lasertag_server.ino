@@ -118,10 +118,15 @@ void loop() {
       millis() - lastSettingsPull > SETTINGS_PULL_INTERVAL_MS) {
     lastSettingsPull = millis();
     bool startReq = false;
-    if (bridgePullSettings(startReq)) {
-      if (startReq && (g_matchPhase == MATCH_IDLE || g_matchPhase == MATCH_DONE)) {
+    if (bridgePullSettings(startReq) && startReq) {
+      if (g_matchPhase == MATCH_IDLE || g_matchPhase == MATCH_DONE) {
         LT_LOG("Match-Start angefordert vom Webservice");
-        matchStart();
+        if (matchStart()) {
+          matchActivate();
+        }
+      } else if (g_matchPhase == MATCH_LOBBY) {
+        LT_LOG("Match-Aktivierung angefordert vom Webservice");
+        matchActivate();
       }
     }
   }

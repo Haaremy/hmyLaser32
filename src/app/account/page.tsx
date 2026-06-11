@@ -2,6 +2,7 @@ import { getTranslations } from 'next-intl/server';
 import { db } from '@/lib/db';
 import { getSession } from '@/lib/session';
 import { AccountForms } from './AccountForms';
+import { NfcTokenBox } from './NfcTokenBox';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +51,7 @@ export default async function AccountPage() {
   );
   const kd = totals.deaths === 0 ? totals.hits.toFixed(2) : (totals.hits / totals.deaths).toFixed(2);
   const accuracy = totals.shots === 0 ? '—' : ((totals.hits / totals.shots) * 100).toFixed(1) + ' %';
+  const nfcCardContent = `${user.username}|${user.nfcToken}`;
 
   return (
     <>
@@ -73,7 +75,7 @@ export default async function AccountPage() {
             </div>
           </div>
           <h3>{t('nfc_token')}</h3>
-          <code className="hmy-code" style={{ wordBreak: 'break-all', fontSize: '1rem', display: 'block', padding: '0.75rem' }}>{user.nfcToken}</code>
+          <NfcTokenBox value={nfcCardContent} copyLabel={t('nfc_copy')} copiedLabel={t('nfc_copied')} />
           <p style={{ marginTop: '0.5rem', fontSize: 'var(--hmy-font-size-sm)' }}>{t('nfc_hint')}</p>
         </div>
       </section>

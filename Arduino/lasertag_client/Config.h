@@ -50,6 +50,8 @@ constexpr uint16_t LED_DATA_PIN = 27;
 constexpr uint16_t NFC_SS_PIN  = 5;
 constexpr uint16_t NFC_RST_PIN = 33;
 // SPI-Pins: MOSI=23, MISO=19, SCK=18 (Hardware-SPI VSPI)
+constexpr uint8_t NFC_DATA_BLOCKS[] = {4, 5, 6, 8, 9};
+constexpr size_t NFC_DATA_BLOCK_COUNT = sizeof(NFC_DATA_BLOCKS) / sizeof(NFC_DATA_BLOCKS[0]);
 
 // OLED I²C (Pins 21=SDA, 22=SCL — über Wire.begin in setup)
 
