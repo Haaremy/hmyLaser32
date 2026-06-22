@@ -25,8 +25,15 @@ static int findFreeSnapshot() {
   return -1;
 }
 
+static uint8_t reverse8(uint8_t value) {
+  value = (value & 0xF0) >> 4 | (value & 0x0F) << 4;
+  value = (value & 0xCC) >> 2 | (value & 0x33) << 2;
+  value = (value & 0xAA) >> 1 | (value & 0x55) << 1;
+  return value;
+}
+
 static uint8_t necCommand(uint32_t playerId) {
-  return (uint8_t)((playerId >> 8) & 0xFFu);
+  return reverse8((uint8_t)((playerId >> 8) & 0xFFu));
 }
 
 static uint32_t defaultColorForPlayer(uint32_t playerId, int idx) {

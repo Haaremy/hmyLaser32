@@ -3,7 +3,6 @@
 
 #include <Arduino.h>
 #include <esp_now.h>
-#include <IRrecv.h>
 #include <IRsend.h>
 #include <U8g2lib.h>
 #include "Config.h"
@@ -11,12 +10,6 @@
 
 extern U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2;
 extern IRsend irsend;
-extern IRrecv irrecv;
-extern IRrecv irrecvSecondary;
-extern IRrecv irrecvTertiary;
-extern decode_results results;
-extern decode_results resultsSecondary;
-extern decode_results resultsTertiary;
 
 extern bool lastButtonState;
 extern bool lastRawButtonReading;

@@ -14,7 +14,6 @@
 #include <WiFi.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
-#include <IRrecv.h>
 #include <IRsend.h>
 #include <Wire.h>
 #include <U8g2lib.h>
@@ -27,15 +26,10 @@
 #include "Led.h"
 #include "Nfc.h"
 #include "Ranking.h"
+#include "ZoneIr.h"
 
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 IRsend irsend(IR_SEND_PIN);
-IRrecv irrecv(IR_RECV_PIN);
-IRrecv irrecvSecondary(IR_RECV_PIN_SECONDARY);
-IRrecv irrecvTertiary(IR_RECV_PIN_TERTIARY);
-decode_results results;
-decode_results resultsSecondary;
-decode_results resultsTertiary;
 
 bool lastButtonState = HIGH;
 bool lastRawButtonReading = HIGH;
@@ -117,14 +111,9 @@ void setup() {
   u8g2.sendBuffer();
 
   pinMode(BUTTON_PIN, INPUT_PULLUP);
-  pinMode(IR_RECV_PIN, INPUT_PULLUP);
-  pinMode(IR_RECV_PIN_SECONDARY, INPUT_PULLUP);
-  pinMode(IR_RECV_PIN_TERTIARY, INPUT_PULLUP);
   setLedNormalState();
   irsend.begin();
-  irrecv.enableIRIn();
-  if (HAS_ZONE2_RECEIVER) irrecvSecondary.enableIRIn();
-  if (HAS_ZONE3_RECEIVER) irrecvTertiary.enableIRIn();
+  zoneIrBegin();
 
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();

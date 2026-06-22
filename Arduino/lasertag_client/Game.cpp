@@ -8,9 +8,21 @@
 #include "Led.h"
 #include "LasertagNetwork.h"
 #include "Ranking.h"
+#include "ZoneIr.h"
 
 uint32_t getMyPlayerId() {
   return irsend.encodeNEC(IR_GAME_ADDRESS, identityMyCommand());
+}
+
+static uint8_t reverse8(uint8_t value) {
+  value = (value & 0xF0) >> 4 | (value & 0x0F) << 4;
+  value = (value & 0xCC) >> 2 | (value & 0x33) << 2;
+  value = (value & 0xAA) >> 1 | (value & 0x55) << 1;
+  return value;
+}
+
+static uint8_t commandFromPlayerId(uint32_t playerId) {
+  return reverse8((uint8_t)((playerId >> 8) & 0xFFu));
 }
 
 bool isPlayerDisabled() {
@@ -36,7 +48,7 @@ bool isShootingAllowed() {
 }
 
 static uint32_t resolveShooterColor(uint32_t shooterPlayerId) {
-  uint8_t cmd = (uint8_t)((shooterPlayerId >> 8) & 0xFF);
+  uint8_t cmd = commandFromPlayerId(shooterPlayerId);
   bool teamsFresh = g_teamCount > 0 && (millis() - g_teamsLastUpdate) < TEAMS_TIMEOUT_MS;
   if (teamsFresh) {
     uint32_t bit = (cmd >= 1 && cmd <= 32) ? (1u << (cmd - 1)) : 0u;
@@ -85,7 +97,7 @@ static void resetHitCounters() {
 }
 
 static int teamIndexForPlayer(uint32_t playerId) {
-  uint8_t cmd = (uint8_t)((playerId >> 8) & 0xFF);
+  uint8_t cmd = commandFromPlayerId(playerId);
   bool teamsFresh = g_teamCount > 0 && (millis() - g_teamsLastUpdate) < TEAMS_TIMEOUT_MS;
   if (!teamsFresh) return -1;
   uint32_t bit = (cmd >= 1 && cmd <= 32) ? (1u << (cmd - 1)) : 0u;
@@ -103,19 +115,43 @@ static bool isFriendlyFire(uint32_t shooterPlayerId) {
   return shooterTeam >= 0 && myTeam >= 0 && shooterTeam == myTeam;
 }
 
-static bool handleIrReceiverInput(IRrecv &receiver,
-                                  decode_results &decoded,
-                                  const char *sensorName,
-                                  int &sensorHitCount,
-                                  int zonePoints) {
-  if (!receiver.decode(&decoded)) return true;
+static uint16_t encodedAddressPrefix() {
+  return (uint16_t)((irsend.encodeNEC(IR_GAME_ADDRESS, 0) >> 16) & 0xFFFFu);
+}
 
-  if (decoded.decode_type != NEC || decoded.bits != 32) {
-    receiver.resume();
-    return true;
+static bool isValidGameNec(uint32_t raw) {
+  const uint16_t addressPrefix = (uint16_t)((raw >> 16) & 0xFFFFu);
+  const uint8_t encodedCommand = (uint8_t)((raw >> 8) & 0xFFu);
+  const uint8_t encodedCommandInverse = (uint8_t)(raw & 0xFFu);
+  return addressPrefix == encodedAddressPrefix() &&
+         (uint8_t)(encodedCommand ^ encodedCommandInverse) == 0xFFu;
+}
+
+static const char *zoneName(uint8_t zone) {
+  switch (zone) {
+    case 1: return "ZONE1";
+    case 2: return "ZONE2";
+    case 3: return "ZONE3";
+    default: return "ZONE?";
   }
+}
 
-  const uint32_t shooterId = irsend.encodeNEC(decoded.address, decoded.command);
+static int zonePointsForFrame(const ZoneIrFrame &frame) {
+  if (frame.zone >= 1 && frame.zone <= 3) return g_zonePoints[frame.zone - 1];
+  return 0;
+}
+
+static bool shouldPreferFrame(const ZoneIrFrame &candidate, const ZoneIrFrame &selected) {
+  const int candidatePoints = zonePointsForFrame(candidate);
+  const int selectedPoints = zonePointsForFrame(selected);
+  if (candidatePoints != selectedPoints) return candidatePoints > selectedPoints;
+  return (int32_t)(candidate.startUs - selected.startUs) < 0;
+}
+
+static bool handleIrZoneFrame(uint32_t shooterId,
+                              const char *sensorName,
+                              int &sensorHitCount,
+                              int zonePoints) {
   const char *shooterName = findPlayerNameById(shooterId);
   char shooterNameCopy[12] = {};
   const bool withinSelfHitWindow = millis() - lastShotAt < SELF_HIT_IGNORE_MS;
@@ -123,14 +159,21 @@ static bool handleIrReceiverInput(IRrecv &receiver,
     strncpy(shooterNameCopy, shooterName, sizeof(shooterNameCopy) - 1);
     shooterNameCopy[sizeof(shooterNameCopy) - 1] = '\0';
   } else {
-    uint8_t cmd = (uint8_t)((shooterId >> 8) & 0xFF);
+    uint8_t cmd = commandFromPlayerId(shooterId);
     snprintf(shooterNameCopy, sizeof(shooterNameCopy), "Cmd%03u", (unsigned)cmd);
   }
 
-  if (decoded.address != IR_GAME_ADDRESS) {
+  if (!isValidGameNec(shooterId)) {
+    Serial.printf("[IR:%s] ignored raw=0x%08lx expectedPrefix=0x%04x\n",
+                  sensorName,
+                  (unsigned long)shooterId,
+                  (unsigned)encodedAddressPrefix());
   } else if (isPlayerDisabled()) {
+    Serial.printf("[IR:%s] ignored while disabled from %s\n", sensorName, shooterNameCopy);
   } else if (!isShootingAllowed()) {
+    Serial.printf("[IR:%s] ignored outside ACTIVE phase from %s\n", sensorName, shooterNameCopy);
   } else if (shooterId == getMyPlayerId() && withinSelfHitWindow) {
+    Serial.printf("[IR:%s] ignored self reflection from %s\n", sensorName, shooterNameCopy);
   } else if (shooterId != getMyPlayerId() && !isFriendlyFire(shooterId)) {
     hitCount++;
     sensorHitCount++;
@@ -154,28 +197,51 @@ static bool handleIrReceiverInput(IRrecv &receiver,
     updateDisplay();
   }
 
-  receiver.resume();
   return true;
 }
 
 bool handleIrReceiver() {
-  bool ok = true;
-  ok = handleIrReceiverInput(irrecv, results, "ZONE1", hitCountPrimary, g_zonePoints[0]) && ok;
-  if (HAS_ZONE2_RECEIVER) {
-    ok = handleIrReceiverInput(irrecvSecondary,
-                               resultsSecondary,
-                               "ZONE2",
-                               hitCountSecondary,
-                               g_zonePoints[1]) && ok;
+  ZoneIrFrame frame = {};
+  if (isPlayerDisabled()) {
+    while (zoneIrPoll(frame)) { }
+    return false;
   }
-  if (HAS_ZONE3_RECEIVER) {
-    ok = handleIrReceiverInput(irrecvTertiary,
-                               resultsTertiary,
-                               "ZONE3",
-                               hitCountTertiary,
-                               g_zonePoints[2]) && ok;
+
+  ZoneIrFrame selected = {};
+  bool hasSelected = false;
+  while (zoneIrPoll(frame)) {
+    if (!isValidGameNec(frame.raw)) {
+      Serial.printf("[IR:%s GPIO%u] ignored raw=0x%08lx expectedPrefix=0x%04x\n",
+                    zoneName(frame.zone),
+                    (unsigned)frame.pin,
+                    (unsigned long)frame.raw,
+                    (unsigned)encodedAddressPrefix());
+      continue;
+    }
+    Serial.printf("[IR:%s GPIO%u] candidate raw=0x%08lx t=%lu pts=%d\n",
+                  zoneName(frame.zone),
+                  (unsigned)frame.pin,
+                  (unsigned long)frame.raw,
+                  (unsigned long)frame.startUs,
+                  zonePointsForFrame(frame));
+    if (!hasSelected || shouldPreferFrame(frame, selected)) {
+      selected = frame;
+      hasSelected = true;
+    }
   }
-  return ok;
+
+  if (!hasSelected) return false;
+
+  if (selected.zone == 1) {
+    return handleIrZoneFrame(selected.raw, "ZONE1", hitCountPrimary, g_zonePoints[0]);
+  }
+  if (selected.zone == 2) {
+    return handleIrZoneFrame(selected.raw, "ZONE2", hitCountSecondary, g_zonePoints[1]);
+  }
+  if (selected.zone == 3) {
+    return handleIrZoneFrame(selected.raw, "ZONE3", hitCountTertiary, g_zonePoints[2]);
+  }
+  return false;
 }
 
 void resetRuntimeStatsForNewMatch() {

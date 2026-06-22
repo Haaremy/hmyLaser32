@@ -32,8 +32,11 @@
 // IR
 constexpr uint16_t IR_SEND_PIN = 14;
 constexpr uint16_t IR_RECV_PIN = 13;
-constexpr uint16_t IR_RECV_PIN_SECONDARY = 26;
+constexpr uint16_t IR_RECV_PIN_SECONDARY = 17;
 constexpr uint16_t IR_RECV_PIN_TERTIARY = 25;
+constexpr uint8_t IR_RECV_ZONE = 1;
+constexpr uint8_t IR_RECV_ZONE_SECONDARY = 2;
+constexpr uint8_t IR_RECV_ZONE_TERTIARY = 3;
 constexpr bool HAS_ZONE2_RECEIVER = true;
 constexpr bool HAS_ZONE3_RECEIVER = true;
 
@@ -49,6 +52,9 @@ constexpr uint16_t LED_DATA_PIN = 27;
 // NFC (MFRC522 via SPI, nur relevant wenn HAS_NFC = 1)
 constexpr uint16_t NFC_SS_PIN  = 5;
 constexpr uint16_t NFC_RST_PIN = 33;
+constexpr uint16_t NFC_SCK_PIN = 18;
+constexpr uint16_t NFC_MISO_PIN = 19;
+constexpr uint16_t NFC_MOSI_PIN = 23;
 // SPI-Pins: MOSI=23, MISO=19, SCK=18 (Hardware-SPI VSPI)
 constexpr uint8_t NFC_DATA_BLOCKS[] = {4, 5, 6, 8, 9};
 constexpr size_t NFC_DATA_BLOCK_COUNT = sizeof(NFC_DATA_BLOCKS) / sizeof(NFC_DATA_BLOCKS[0]);

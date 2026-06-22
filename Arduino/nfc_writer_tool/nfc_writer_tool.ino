@@ -292,7 +292,7 @@ static void handleReset() {
 void setup() {
   Serial.begin(115200);
   delay(500);
-  SPI.begin();
+  SPI.begin(NFC_SCK_PIN, NFC_MISO_PIN, NFC_MOSI_PIN, NFC_SS_PIN);
   nfc.PCD_Init();
 
   uint64_t mac = ESP.getEfuseMac();

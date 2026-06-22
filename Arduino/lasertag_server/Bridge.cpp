@@ -303,10 +303,17 @@ bool bridgeForwardHit(const char *shooterNfc, const char *targetNfc, int points)
   return code == 200;
 }
 
-// Extrahiert das NEC-Command-Byte aus dem 32-bit playerId.
-// NEC-Encoding (siehe IRremoteESP8266 encodeNEC): bits 8..15 = command.
+static uint8_t reverse8(uint8_t value) {
+  value = (value & 0xF0) >> 4 | (value & 0x0F) << 4;
+  value = (value & 0xCC) >> 2 | (value & 0x33) << 2;
+  value = (value & 0xAA) >> 1 | (value & 0x55) << 1;
+  return value;
+}
+
+// Extrahiert die urspruengliche NEC-Command-ID aus dem 32-bit playerId.
+// IRremoteESP8266::encodeNEC legt das Command-Byte bit-reversed ab.
 static uint8_t necCommand(uint32_t playerId) {
-  return (uint8_t)((playerId >> 8) & 0xFFu);
+  return reverse8((uint8_t)((playerId >> 8) & 0xFFu));
 }
 
 bool bridgePushKnownPlayers() {

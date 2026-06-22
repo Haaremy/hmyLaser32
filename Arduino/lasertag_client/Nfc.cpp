@@ -17,9 +17,14 @@ static bool kBound = false;
 
 void nfcBegin() {
 #if HAS_NFC
-  SPI.begin();
+  SPI.begin(NFC_SCK_PIN, NFC_MISO_PIN, NFC_MOSI_PIN, NFC_SS_PIN);
   mfrc522.PCD_Init();
-  Serial.println("[NFC] MFRC522 ready");
+  Serial.printf("[NFC] MFRC522 ready SS=%u RST=%u SCK=%u MISO=%u MOSI=%u\n",
+                (unsigned)NFC_SS_PIN,
+                (unsigned)NFC_RST_PIN,
+                (unsigned)NFC_SCK_PIN,
+                (unsigned)NFC_MISO_PIN,
+                (unsigned)NFC_MOSI_PIN);
 #else
   Serial.println("[NFC] disabled (HAS_NFC=0)");
 #endif
@@ -43,11 +48,17 @@ static bool nfcReadCard(char *out, size_t maxLen) {
     byte size = sizeof(buffer);
     MFRC522::StatusCode status = mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, block, &key, &(mfrc522.uid));
     if (status != MFRC522::STATUS_OK) {
+      Serial.printf("[NFC] auth failed block %u: %s\n",
+                    (unsigned)block,
+                    mfrc522.GetStatusCodeName(status));
       ok = false;
       break;
     }
     status = mfrc522.MIFARE_Read(block, buffer, &size);
     if (status != MFRC522::STATUS_OK) {
+      Serial.printf("[NFC] read failed block %u: %s\n",
+                    (unsigned)block,
+                    mfrc522.GetStatusCodeName(status));
       ok = false;
       break;
     }
@@ -79,6 +90,7 @@ void nfcLoop() {
 
   char raw[96] = {};
   if (!nfcReadCard(raw, sizeof(raw))) return;
+  Serial.printf("[NFC] raw=%s\n", raw);
 
   // Parse "<username>|<token>"
   char *sep = strchr(raw, '|');

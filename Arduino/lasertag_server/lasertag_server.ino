@@ -120,10 +120,8 @@ void loop() {
     bool startReq = false;
     if (bridgePullSettings(startReq) && startReq) {
       if (g_matchPhase == MATCH_IDLE || g_matchPhase == MATCH_DONE) {
-        LT_LOG("Match-Start angefordert vom Webservice");
-        if (matchStart()) {
-          matchActivate();
-        }
+        LT_LOG("Warteraum angefordert vom Webservice");
+        matchStart();
       } else if (g_matchPhase == MATCH_LOBBY) {
         LT_LOG("Match-Aktivierung angefordert vom Webservice");
         matchActivate();

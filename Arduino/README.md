@@ -43,7 +43,7 @@ Defined in `lasertag_client/Config.h`.
 
 | Function | GPIO |
 |---|---|
-| IR send | 4 |
+| IR send | 14 |
 | IR receive zone 1 | 13 |
 | IR receive zone 2 | 26 |
 | IR receive zone 3 | 25 |
@@ -127,6 +127,7 @@ Important modules:
 | `Config.h` | pins, timing, message IDs |
 | `Types.h` | shared ESP-NOW wire structs |
 | `Game.cpp` | trigger, IR receive, scoring, respawn, friendly-fire check |
+| `ZoneIr.cpp` | interrupt-based NEC receiver for the three hit zones |
 | `Network.cpp` | ESP-NOW receive/send, player state, config, hit events |
 | `Ranking.cpp` | ranking table anti-entropy |
 | `Identity.cpp` | auto name, command ID, color, lobby master election |
@@ -151,7 +152,11 @@ to the server with `MSG_PLAYER_STATE`.
 ### Scoring
 
 - Shots are allowed only during `PHASE_ACTIVE`.
-- A valid hit awards zone-specific points to the shooter.
+- A valid hit awards zone-specific points to the shooter. The client decodes
+  NEC receive frames with per-zone GPIO interrupts, because `IRrecv` cannot
+  reliably separate three simultaneous receiver instances.
+  The logical zone mapping is configurable in `Config.h` via
+  `IR_RECV_ZONE`, `IR_RECV_ZONE_SECONDARY`, and `IR_RECV_ZONE_TERTIARY`.
 - Defaults: Zone1/chest `15`, Zone2/shoulders `10`, Zone3/back or weapon `5`.
 - Team-mode friendly fire is ignored.
 - The receiving client broadcasts `MSG_HIT_EVENT` with shooter and target data.

@@ -131,7 +131,7 @@ static void handlePlayerConfig(const Message &m) {
       identitySetColor(color);
     }
     g_myTeamIndex = (int8_t)e.points;
-    if (e.player[0] != '\0') identitySetName(e.player);
+    if (e.player[0] != '\0' && !nfcIsBound()) identitySetName(e.player);
     Serial.printf("[CONFIG] cmd=%u team=%d color=#%06lx name=%s\n",
                   (unsigned)myCmd, (int)g_myTeamIndex, (unsigned long)color, identityMyName());
     broadcastPlayerState();
